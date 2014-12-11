@@ -1,0 +1,13 @@
+[package]
+
+name = "rustc-serialize"
+version = "0.1.0"
+authors = ["The Rust Project Developers"]
+license = "MIT/Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/rust-lang/rustc-serialize"
+homepage = "https://github.com/rust-lang/rustc-serialize"
+description = """
+Generic serialization/deserialization support corresponding to the
+`deriving(RustcEncodable, RustcDecodable)` mode in the compiler.
+"""
