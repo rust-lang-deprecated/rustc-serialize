@@ -1987,7 +1987,7 @@ macro_rules! expect(
             }
         }
     })
-)
+);
 
 macro_rules! read_primitive {
     ($name:ident, $ty:ty) => {
@@ -2019,16 +2019,16 @@ impl ::Decoder<DecoderError> for Decoder {
         expect!(self.pop(), Null)
     }
 
-    read_primitive!(read_uint, uint)
-    read_primitive!(read_u8, u8)
-    read_primitive!(read_u16, u16)
-    read_primitive!(read_u32, u32)
-    read_primitive!(read_u64, u64)
-    read_primitive!(read_int, int)
-    read_primitive!(read_i8, i8)
-    read_primitive!(read_i16, i16)
-    read_primitive!(read_i32, i32)
-    read_primitive!(read_i64, i64)
+    read_primitive!(read_uint, uint);
+    read_primitive!(read_u8, u8);
+    read_primitive!(read_u16, u16);
+    read_primitive!(read_u32, u32);
+    read_primitive!(read_u64, u64);
+    read_primitive!(read_int, int);
+    read_primitive!(read_i8, i8);
+    read_primitive!(read_i16, i16);
+    read_primitive!(read_i32, i32);
+    read_primitive!(read_i64, i64);
 
     fn read_f32(&mut self) -> DecodeResult<f32> { self.read_f64().map(|x| x as f32) }
 
@@ -2283,9 +2283,9 @@ macro_rules! to_json_impl_i64(
             fn to_json(&self) -> Json { Json::I64(*self as i64) }
         })+
     )
-)
+);
 
-to_json_impl_i64!(int, i8, i16, i32, i64)
+to_json_impl_i64!(int, i8, i16, i32, i64);
 
 macro_rules! to_json_impl_u64(
     ($($t:ty), +) => (
@@ -2293,9 +2293,9 @@ macro_rules! to_json_impl_u64(
             fn to_json(&self) -> Json { Json::U64(*self as u64) }
         })+
     )
-)
+);
 
-to_json_impl_u64!(uint, u8, u16, u32, u64)
+to_json_impl_u64!(uint, u8, u16, u32, u64);
 
 impl ToJson for Json {
     fn to_json(&self) -> Json { self.clone() }
@@ -2719,7 +2719,7 @@ mod tests {
             });
             assert_eq!(s, $expected);
         })
-    )
+    );
 
     #[test]
     fn test_write_some() {
