@@ -2923,7 +2923,7 @@ mod tests {
     #[test]
     fn test_decode_tuple() {
         let t: (uint, uint, uint) = super::decode("[1, 2, 3]").unwrap();
-        assert_eq!(t, (1u, 2, 3))
+        assert_eq!(t, (1u, 2, 3));
 
         let t: (uint, string::String) = super::decode("[1, \"two\"]").unwrap();
         assert_eq!(t, (1u, "two".into_string()));
