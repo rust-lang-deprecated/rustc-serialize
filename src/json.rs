@@ -151,7 +151,7 @@
 //!
 //! ```rust
 //! extern crate serialize;
-//! use std::collections::TreeMap;
+//! use std::collections::BTreeMap;
 //! use serialize::json::{mod, Json, ToJson};
 //!
 //! // Only generate `Decodable` trait implementation
@@ -165,7 +165,7 @@
 //! // Specify encoding method manually
 //! impl ToJson for TestStruct {
 //!     fn to_json(&self) -> Json {
-//!         let mut d = TreeMap::new();
+//!         let mut d = BTreeMap::new();
 //!         // All standard types implement `to_json()`, so use it
 //!         d.insert("data_int".to_string(), self.data_int.to_json());
 //!         d.insert("data_str".to_string(), self.data_str.to_json());
@@ -973,7 +973,7 @@ impl Json {
         self.as_object().is_some()
     }
 
-    /// If the Json value is an Object, returns the associated TreeMap.
+    /// If the Json value is an Object, returns the associated BTreeMap.
     /// Returns None otherwise.
     pub fn as_object<'a>(&'a self) -> Option<&'a Object> {
         match self {
