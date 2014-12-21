@@ -258,63 +258,6 @@ impl<
     E,
     S: Encoder<E>,
     V: Encodable<S, E>
-> Encodable<S, E> for TrieMap<V> {
-    fn encode(&self, e: &mut S) -> Result<(), E> {
-        e.emit_map(self.len(), |e| {
-                for (i, (key, val)) in self.iter().enumerate() {
-                    try!(e.emit_map_elt_key(i, |e| key.encode(e)));
-                    try!(e.emit_map_elt_val(i, |e| val.encode(e)));
-                }
-                Ok(())
-            })
-    }
-}
-
-impl<
-    E,
-    D: Decoder<E>,
-    V: Decodable<D, E>
-> Decodable<D, E> for TrieMap<V> {
-    fn decode(d: &mut D) -> Result<TrieMap<V>, E> {
-        d.read_map(|d, len| {
-            let mut map = TrieMap::new();
-            for i in range(0u, len) {
-                let key = try!(d.read_map_elt_key(i, |d| Decodable::decode(d)));
-                let val = try!(d.read_map_elt_val(i, |d| Decodable::decode(d)));
-                map.insert(key, val);
-            }
-            Ok(map)
-        })
-    }
-}
-
-impl<E, S: Encoder<E>> Encodable<S, E> for TrieSet {
-    fn encode(&self, s: &mut S) -> Result<(), E> {
-        s.emit_seq(self.len(), |s| {
-                for (i, e) in self.iter().enumerate() {
-                    try!(s.emit_seq_elt(i, |s| e.encode(s)));
-                }
-                Ok(())
-            })
-    }
-}
-
-impl<E, D: Decoder<E>> Decodable<D, E> for TrieSet {
-    fn decode(d: &mut D) -> Result<TrieSet, E> {
-        d.read_seq(|d, len| {
-            let mut set = TrieSet::new();
-            for i in range(0u, len) {
-                set.insert(try!(d.read_seq_elt(i, |d| Decodable::decode(d))));
-            }
-            Ok(set)
-        })
-    }
-}
-
-impl<
-    E,
-    S: Encoder<E>,
-    V: Encodable<S, E>
 > Encodable<S, E> for VecMap<V> {
     fn encode(&self, e: &mut S) -> Result<(), E> {
         e.emit_map(self.len(), |e| {
