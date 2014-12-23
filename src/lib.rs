@@ -20,6 +20,8 @@
 #[cfg(test)]
 extern crate test;
 
+extern crate unicode;
+
 pub use self::serialize::{Decoder, Encoder, Decodable, Encodable,
                           DecoderHelpers, EncoderHelpers};
 
@@ -29,3 +31,7 @@ mod collection_impls;
 pub mod base64;
 pub mod hex;
 pub mod json;
+
+mod rustc_serialize {
+    pub use serialize::*;
+}

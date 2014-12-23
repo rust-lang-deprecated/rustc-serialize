@@ -15,7 +15,7 @@ use std::default::Default;
 use std::hash::{Hash, Hasher};
 
 use {Decodable, Encodable, Decoder, Encoder};
-use std::collections::{BTreeMap, BTreeSet, DList, RingBuf, HashMap, HashSet, VecMap};
+use std::collections::{DList, RingBuf, BTreeMap, BTreeSet, HashMap, HashSet, VecMap};
 use std::collections::enum_set::{EnumSet, CLike};
 
 impl<
