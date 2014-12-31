@@ -292,7 +292,7 @@ pub fn error_str(error: ErrorCode) -> &'static str {
 
 /// Shortcut function to decode a JSON `&str` into an object
 pub fn decode<T: ::Decodable<Decoder, DecoderError>>(s: &str) -> DecodeResult<T> {
-    let json = match from_str(s) {
+    let json = match Json::from_str(s) {
         Ok(x) => x,
         Err(e) => return Err(ParseError(e))
     };
@@ -929,6 +929,26 @@ impl<E: ::Encoder<S>, S> Encodable<E, S> for Json {
 }
 
 impl Json {
+    /// Decodes a json value from an `&mut io::Reader`
+    pub fn from_reader(rdr: &mut io::Reader) -> Result<Self, BuilderError> {
+        let contents = match rdr.read_to_end() {
+            Ok(c)  => c,
+            Err(e) => return Err(io_error_to_error(e))
+        };
+        let s = match str::from_utf8(contents.as_slice()).ok() {
+            Some(s) => s,
+            _       => return Err(SyntaxError(NotUtf8, 0, 0))
+        };
+        let mut builder = Builder::new(s.chars());
+        builder.build()
+    }
+
+    /// Decodes a json value from a string
+    pub fn from_str(s: &str) -> Result<Self, BuilderError> {
+        let mut builder = Builder::new(s.chars());
+        builder.build()
+    }
+
     /// Encodes a json value into an io::writer. Uses a single line.
     pub fn to_writer(&self, writer: &mut io::Writer) -> EncodeResult {
         let mut encoder = Encoder::new(writer);
@@ -1959,26 +1979,6 @@ impl<T: Iterator<char>> Builder<T> {
     }
 }
 
-/// Decodes a json value from an `&mut io::Reader`
-pub fn from_reader(rdr: &mut io::Reader) -> Result<Json, BuilderError> {
-    let contents = match rdr.read_to_end() {
-        Ok(c)  => c,
-        Err(e) => return Err(io_error_to_error(e))
-    };
-    let s = match str::from_utf8(contents.as_slice()).ok() {
-        Some(s) => s,
-        _       => return Err(SyntaxError(NotUtf8, 0, 0))
-    };
-    let mut builder = Builder::new(s.chars());
-    builder.build()
-}
-
-/// Decodes a json value from a string
-pub fn from_str(s: &str) -> Result<Json, BuilderError> {
-    let mut builder = Builder::new(s.chars());
-    builder.build()
-}
-
 /// A structure to decode JSON to values in rust.
 pub struct Decoder {
     stack: Vec<Json>,
@@ -2436,7 +2436,7 @@ impl fmt::Show for Json {
 
 impl FromStr for Json {
     fn from_str(s: &str) -> Option<Json> {
-        from_str(s).ok()
+        Json::from_str(s).ok()
     }
 }
 
@@ -2453,7 +2453,7 @@ mod tests {
     use super::DecoderError::*;
     use super::JsonEvent::*;
     use super::StackElement::*;
-    use super::{PrettyEncoder, Json, from_str, DecodeResult, DecoderError, JsonEvent, Parser,
+    use super::{PrettyEncoder, Json, DecodeResult, DecoderError, JsonEvent, Parser,
                 StackElement, Stack, Encoder, Decoder};
     use std::{i64, u64, f32, f64, io};
     use std::collections::BTreeMap;
@@ -2681,9 +2681,9 @@ mod tests {
 
         // We can't compare the strings directly because the object fields be
         // printed in a different order.
-        assert_eq!(a.clone(), from_str(a.to_string().as_slice()).unwrap());
+        assert_eq!(a.clone(), Json::from_str(a.to_string().as_slice()).unwrap());
         assert_eq!(a.clone(),
-                   from_str(a.to_pretty_str().as_slice()).unwrap());
+                   Json::from_str(a.to_pretty_str().as_slice()).unwrap());
     }
 
     fn with_str_writer<F>(f: F) -> string::String where F: FnOnce(&mut io::Writer){
@@ -2773,29 +2773,29 @@ mod tests {
 
     #[test]
     fn test_trailing_characters() {
-        assert_eq!(from_str("nulla"),  Err(SyntaxError(TrailingCharacters, 1, 5)));
-        assert_eq!(from_str("truea"),  Err(SyntaxError(TrailingCharacters, 1, 5)));
-        assert_eq!(from_str("falsea"), Err(SyntaxError(TrailingCharacters, 1, 6)));
-        assert_eq!(from_str("1a"),     Err(SyntaxError(TrailingCharacters, 1, 2)));
-        assert_eq!(from_str("[]a"),    Err(SyntaxError(TrailingCharacters, 1, 3)));
-        assert_eq!(from_str("{}a"),    Err(SyntaxError(TrailingCharacters, 1, 3)));
+        assert_eq!(Json::from_str("nulla"),  Err(SyntaxError(TrailingCharacters, 1, 5)));
+        assert_eq!(Json::from_str("truea"),  Err(SyntaxError(TrailingCharacters, 1, 5)));
+        assert_eq!(Json::from_str("falsea"), Err(SyntaxError(TrailingCharacters, 1, 6)));
+        assert_eq!(Json::from_str("1a"),     Err(SyntaxError(TrailingCharacters, 1, 2)));
+        assert_eq!(Json::from_str("[]a"),    Err(SyntaxError(TrailingCharacters, 1, 3)));
+        assert_eq!(Json::from_str("{}a"),    Err(SyntaxError(TrailingCharacters, 1, 3)));
     }
 
     #[test]
     fn test_read_identifiers() {
-        assert_eq!(from_str("n"),    Err(SyntaxError(InvalidSyntax, 1, 2)));
-        assert_eq!(from_str("nul"),  Err(SyntaxError(InvalidSyntax, 1, 4)));
-        assert_eq!(from_str("t"),    Err(SyntaxError(InvalidSyntax, 1, 2)));
-        assert_eq!(from_str("truz"), Err(SyntaxError(InvalidSyntax, 1, 4)));
-        assert_eq!(from_str("f"),    Err(SyntaxError(InvalidSyntax, 1, 2)));
-        assert_eq!(from_str("faz"),  Err(SyntaxError(InvalidSyntax, 1, 3)));
+        assert_eq!(Json::from_str("n"),    Err(SyntaxError(InvalidSyntax, 1, 2)));
+        assert_eq!(Json::from_str("nul"),  Err(SyntaxError(InvalidSyntax, 1, 4)));
+        assert_eq!(Json::from_str("t"),    Err(SyntaxError(InvalidSyntax, 1, 2)));
+        assert_eq!(Json::from_str("truz"), Err(SyntaxError(InvalidSyntax, 1, 4)));
+        assert_eq!(Json::from_str("f"),    Err(SyntaxError(InvalidSyntax, 1, 2)));
+        assert_eq!(Json::from_str("faz"),  Err(SyntaxError(InvalidSyntax, 1, 3)));
 
-        assert_eq!(from_str("null"), Ok(Null));
-        assert_eq!(from_str("true"), Ok(Boolean(true)));
-        assert_eq!(from_str("false"), Ok(Boolean(false)));
-        assert_eq!(from_str(" null "), Ok(Null));
-        assert_eq!(from_str(" true "), Ok(Boolean(true)));
-        assert_eq!(from_str(" false "), Ok(Boolean(false)));
+        assert_eq!(Json::from_str("null"), Ok(Null));
+        assert_eq!(Json::from_str("true"), Ok(Boolean(true)));
+        assert_eq!(Json::from_str("false"), Ok(Boolean(false)));
+        assert_eq!(Json::from_str(" null "), Ok(Null));
+        assert_eq!(Json::from_str(" true "), Ok(Boolean(true)));
+        assert_eq!(Json::from_str(" false "), Ok(Boolean(false)));
     }
 
     #[test]
@@ -2812,30 +2812,30 @@ mod tests {
 
     #[test]
     fn test_read_number() {
-        assert_eq!(from_str("+"),   Err(SyntaxError(InvalidSyntax, 1, 1)));
-        assert_eq!(from_str("."),   Err(SyntaxError(InvalidSyntax, 1, 1)));
-        assert_eq!(from_str("NaN"), Err(SyntaxError(InvalidSyntax, 1, 1)));
-        assert_eq!(from_str("-"),   Err(SyntaxError(InvalidNumber, 1, 2)));
-        assert_eq!(from_str("00"),  Err(SyntaxError(InvalidNumber, 1, 2)));
-        assert_eq!(from_str("1."),  Err(SyntaxError(InvalidNumber, 1, 3)));
-        assert_eq!(from_str("1e"),  Err(SyntaxError(InvalidNumber, 1, 3)));
-        assert_eq!(from_str("1e+"), Err(SyntaxError(InvalidNumber, 1, 4)));
+        assert_eq!(Json::from_str("+"),   Err(SyntaxError(InvalidSyntax, 1, 1)));
+        assert_eq!(Json::from_str("."),   Err(SyntaxError(InvalidSyntax, 1, 1)));
+        assert_eq!(Json::from_str("NaN"), Err(SyntaxError(InvalidSyntax, 1, 1)));
+        assert_eq!(Json::from_str("-"),   Err(SyntaxError(InvalidNumber, 1, 2)));
+        assert_eq!(Json::from_str("00"),  Err(SyntaxError(InvalidNumber, 1, 2)));
+        assert_eq!(Json::from_str("1."),  Err(SyntaxError(InvalidNumber, 1, 3)));
+        assert_eq!(Json::from_str("1e"),  Err(SyntaxError(InvalidNumber, 1, 3)));
+        assert_eq!(Json::from_str("1e+"), Err(SyntaxError(InvalidNumber, 1, 4)));
 
-        assert_eq!(from_str("18446744073709551616"), Err(SyntaxError(InvalidNumber, 1, 20)));
-        assert_eq!(from_str("-9223372036854775809"), Err(SyntaxError(InvalidNumber, 1, 21)));
+        assert_eq!(Json::from_str("18446744073709551616"), Err(SyntaxError(InvalidNumber, 1, 20)));
+        assert_eq!(Json::from_str("-9223372036854775809"), Err(SyntaxError(InvalidNumber, 1, 21)));
 
-        assert_eq!(from_str("3"), Ok(U64(3)));
-        assert_eq!(from_str("3.1"), Ok(F64(3.1)));
-        assert_eq!(from_str("-1.2"), Ok(F64(-1.2)));
-        assert_eq!(from_str("0.4"), Ok(F64(0.4)));
-        assert_eq!(from_str("0.4e5"), Ok(F64(0.4e5)));
-        assert_eq!(from_str("0.4e+15"), Ok(F64(0.4e15)));
-        assert_eq!(from_str("0.4e-01"), Ok(F64(0.4e-01)));
-        assert_eq!(from_str(" 3 "), Ok(U64(3)));
+        assert_eq!(Json::from_str("3"), Ok(U64(3)));
+        assert_eq!(Json::from_str("3.1"), Ok(F64(3.1)));
+        assert_eq!(Json::from_str("-1.2"), Ok(F64(-1.2)));
+        assert_eq!(Json::from_str("0.4"), Ok(F64(0.4)));
+        assert_eq!(Json::from_str("0.4e5"), Ok(F64(0.4e5)));
+        assert_eq!(Json::from_str("0.4e+15"), Ok(F64(0.4e15)));
+        assert_eq!(Json::from_str("0.4e-01"), Ok(F64(0.4e-01)));
+        assert_eq!(Json::from_str(" 3 "), Ok(U64(3)));
 
-        assert_eq!(from_str("-9223372036854775808"), Ok(I64(i64::MIN)));
-        assert_eq!(from_str("9223372036854775807"), Ok(U64(i64::MAX as u64)));
-        assert_eq!(from_str("18446744073709551615"), Ok(U64(u64::MAX)));
+        assert_eq!(Json::from_str("-9223372036854775808"), Ok(I64(i64::MIN)));
+        assert_eq!(Json::from_str("9223372036854775807"), Ok(U64(i64::MAX as u64)));
+        assert_eq!(Json::from_str("18446744073709551615"), Ok(U64(u64::MAX)));
     }
 
     #[test]
@@ -2879,19 +2879,19 @@ mod tests {
 
     #[test]
     fn test_read_str() {
-        assert_eq!(from_str("\""),    Err(SyntaxError(EOFWhileParsingString, 1, 2)));
-        assert_eq!(from_str("\"lol"), Err(SyntaxError(EOFWhileParsingString, 1, 5)));
+        assert_eq!(Json::from_str("\""),    Err(SyntaxError(EOFWhileParsingString, 1, 2)));
+        assert_eq!(Json::from_str("\"lol"), Err(SyntaxError(EOFWhileParsingString, 1, 5)));
 
-        assert_eq!(from_str("\"\""), Ok(String("".to_string())));
-        assert_eq!(from_str("\"foo\""), Ok(String("foo".to_string())));
-        assert_eq!(from_str("\"\\\"\""), Ok(String("\"".to_string())));
-        assert_eq!(from_str("\"\\b\""), Ok(String("\x08".to_string())));
-        assert_eq!(from_str("\"\\n\""), Ok(String("\n".to_string())));
-        assert_eq!(from_str("\"\\r\""), Ok(String("\r".to_string())));
-        assert_eq!(from_str("\"\\t\""), Ok(String("\t".to_string())));
-        assert_eq!(from_str(" \"foo\" "), Ok(String("foo".to_string())));
-        assert_eq!(from_str("\"\\u12ab\""), Ok(String("\u{12ab}".to_string())));
-        assert_eq!(from_str("\"\\uAB12\""), Ok(String("\u{AB12}".to_string())));
+        assert_eq!(Json::from_str("\"\""), Ok(String("".to_string())));
+        assert_eq!(Json::from_str("\"foo\""), Ok(String("foo".to_string())));
+        assert_eq!(Json::from_str("\"\\\"\""), Ok(String("\"".to_string())));
+        assert_eq!(Json::from_str("\"\\b\""), Ok(String("\x08".to_string())));
+        assert_eq!(Json::from_str("\"\\n\""), Ok(String("\n".to_string())));
+        assert_eq!(Json::from_str("\"\\r\""), Ok(String("\r".to_string())));
+        assert_eq!(Json::from_str("\"\\t\""), Ok(String("\t".to_string())));
+        assert_eq!(Json::from_str(" \"foo\" "), Ok(String("foo".to_string())));
+        assert_eq!(Json::from_str("\"\\u12ab\""), Ok(String("\u{12ab}".to_string())));
+        assert_eq!(Json::from_str("\"\\uAB12\""), Ok(String("\u{AB12}".to_string())));
     }
 
     #[test]
@@ -2914,22 +2914,22 @@ mod tests {
 
     #[test]
     fn test_read_array() {
-        assert_eq!(from_str("["),     Err(SyntaxError(EOFWhileParsingValue, 1, 2)));
-        assert_eq!(from_str("[1"),    Err(SyntaxError(EOFWhileParsingArray, 1, 3)));
-        assert_eq!(from_str("[1,"),   Err(SyntaxError(EOFWhileParsingValue, 1, 4)));
-        assert_eq!(from_str("[1,]"),  Err(SyntaxError(InvalidSyntax,        1, 4)));
-        assert_eq!(from_str("[6 7]"), Err(SyntaxError(InvalidSyntax,        1, 4)));
+        assert_eq!(Json::from_str("["),     Err(SyntaxError(EOFWhileParsingValue, 1, 2)));
+        assert_eq!(Json::from_str("[1"),    Err(SyntaxError(EOFWhileParsingArray, 1, 3)));
+        assert_eq!(Json::from_str("[1,"),   Err(SyntaxError(EOFWhileParsingValue, 1, 4)));
+        assert_eq!(Json::from_str("[1,]"),  Err(SyntaxError(InvalidSyntax,        1, 4)));
+        assert_eq!(Json::from_str("[6 7]"), Err(SyntaxError(InvalidSyntax,        1, 4)));
 
-        assert_eq!(from_str("[]"), Ok(Array(vec![])));
-        assert_eq!(from_str("[ ]"), Ok(Array(vec![])));
-        assert_eq!(from_str("[true]"), Ok(Array(vec![Boolean(true)])));
-        assert_eq!(from_str("[ false ]"), Ok(Array(vec![Boolean(false)])));
-        assert_eq!(from_str("[null]"), Ok(Array(vec![Null])));
-        assert_eq!(from_str("[3, 1]"),
+        assert_eq!(Json::from_str("[]"), Ok(Array(vec![])));
+        assert_eq!(Json::from_str("[ ]"), Ok(Array(vec![])));
+        assert_eq!(Json::from_str("[true]"), Ok(Array(vec![Boolean(true)])));
+        assert_eq!(Json::from_str("[ false ]"), Ok(Array(vec![Boolean(false)])));
+        assert_eq!(Json::from_str("[null]"), Ok(Array(vec![Null])));
+        assert_eq!(Json::from_str("[3, 1]"),
                      Ok(Array(vec![U64(3), U64(1)])));
-        assert_eq!(from_str("\n[3, 2]\n"),
+        assert_eq!(Json::from_str("\n[3, 2]\n"),
                      Ok(Array(vec![U64(3), U64(2)])));
-        assert_eq!(from_str("[2, [4, 1]]"),
+        assert_eq!(Json::from_str("[2, [4, 1]]"),
                Ok(Array(vec![U64(2), Array(vec![U64(4), U64(1)])])));
     }
 
@@ -2972,39 +2972,39 @@ mod tests {
 
     #[test]
     fn test_read_object() {
-        assert_eq!(from_str("{"),       Err(SyntaxError(EOFWhileParsingObject, 1, 2)));
-        assert_eq!(from_str("{ "),      Err(SyntaxError(EOFWhileParsingObject, 1, 3)));
-        assert_eq!(from_str("{1"),      Err(SyntaxError(KeyMustBeAString,      1, 2)));
-        assert_eq!(from_str("{ \"a\""), Err(SyntaxError(EOFWhileParsingObject, 1, 6)));
-        assert_eq!(from_str("{\"a\""),  Err(SyntaxError(EOFWhileParsingObject, 1, 5)));
-        assert_eq!(from_str("{\"a\" "), Err(SyntaxError(EOFWhileParsingObject, 1, 6)));
+        assert_eq!(Json::from_str("{"),       Err(SyntaxError(EOFWhileParsingObject, 1, 2)));
+        assert_eq!(Json::from_str("{ "),      Err(SyntaxError(EOFWhileParsingObject, 1, 3)));
+        assert_eq!(Json::from_str("{1"),      Err(SyntaxError(KeyMustBeAString,      1, 2)));
+        assert_eq!(Json::from_str("{ \"a\""), Err(SyntaxError(EOFWhileParsingObject, 1, 6)));
+        assert_eq!(Json::from_str("{\"a\""),  Err(SyntaxError(EOFWhileParsingObject, 1, 5)));
+        assert_eq!(Json::from_str("{\"a\" "), Err(SyntaxError(EOFWhileParsingObject, 1, 6)));
 
-        assert_eq!(from_str("{\"a\" 1"),   Err(SyntaxError(ExpectedColon,         1, 6)));
-        assert_eq!(from_str("{\"a\":"),    Err(SyntaxError(EOFWhileParsingValue,  1, 6)));
-        assert_eq!(from_str("{\"a\":1"),   Err(SyntaxError(EOFWhileParsingObject, 1, 7)));
-        assert_eq!(from_str("{\"a\":1 1"), Err(SyntaxError(InvalidSyntax,         1, 8)));
-        assert_eq!(from_str("{\"a\":1,"),  Err(SyntaxError(EOFWhileParsingObject, 1, 8)));
+        assert_eq!(Json::from_str("{\"a\" 1"),   Err(SyntaxError(ExpectedColon,         1, 6)));
+        assert_eq!(Json::from_str("{\"a\":"),    Err(SyntaxError(EOFWhileParsingValue,  1, 6)));
+        assert_eq!(Json::from_str("{\"a\":1"),   Err(SyntaxError(EOFWhileParsingObject, 1, 7)));
+        assert_eq!(Json::from_str("{\"a\":1 1"), Err(SyntaxError(InvalidSyntax,         1, 8)));
+        assert_eq!(Json::from_str("{\"a\":1,"),  Err(SyntaxError(EOFWhileParsingObject, 1, 8)));
 
-        assert_eq!(from_str("{}").unwrap(), mk_object(&[]));
-        assert_eq!(from_str("{\"a\": 3}").unwrap(),
+        assert_eq!(Json::from_str("{}").unwrap(), mk_object(&[]));
+        assert_eq!(Json::from_str("{\"a\": 3}").unwrap(),
                   mk_object(&[("a".to_string(), U64(3))]));
 
-        assert_eq!(from_str(
+        assert_eq!(Json::from_str(
                       "{ \"a\": null, \"b\" : true }").unwrap(),
                   mk_object(&[
                       ("a".to_string(), Null),
                       ("b".to_string(), Boolean(true))]));
-        assert_eq!(from_str("\n{ \"a\": null, \"b\" : true }\n").unwrap(),
+        assert_eq!(Json::from_str("\n{ \"a\": null, \"b\" : true }\n").unwrap(),
                   mk_object(&[
                       ("a".to_string(), Null),
                       ("b".to_string(), Boolean(true))]));
-        assert_eq!(from_str(
+        assert_eq!(Json::from_str(
                       "{\"a\" : 1.0 ,\"b\": [ true ]}").unwrap(),
                   mk_object(&[
                       ("a".to_string(), F64(1.0)),
                       ("b".to_string(), Array(vec![Boolean(true)]))
                   ]));
-        assert_eq!(from_str(
+        assert_eq!(Json::from_str(
                       "{\
                           \"a\": 1.0, \
                           \"b\": [\
@@ -3089,7 +3089,7 @@ mod tests {
 
     #[test]
     fn test_multiline_errors() {
-        assert_eq!(from_str("{\n  \"foo\":\n \"bar\""),
+        assert_eq!(Json::from_str("{\n  \"foo\":\n \"bar\""),
             Err(SyntaxError(EOFWhileParsingObject, 3u, 8u)));
     }
 
@@ -3108,7 +3108,7 @@ mod tests {
     }
     fn check_err<T: Decodable<Decoder, DecoderError>>(to_parse: &'static str,
                                                       expected: DecoderError) {
-        let res: DecodeResult<T> = match from_str(to_parse) {
+        let res: DecodeResult<T> = match Json::from_str(to_parse) {
             Err(e) => Err(ParseError(e)),
             Ok(json) => Decodable::decode(&mut Decoder::new(json))
         };
@@ -3152,28 +3152,28 @@ mod tests {
 
     #[test]
     fn test_find(){
-        let json_value = from_str("{\"dog\" : \"cat\"}").unwrap();
+        let json_value = Json::from_str("{\"dog\" : \"cat\"}").unwrap();
         let found_str = json_value.find("dog");
         assert!(found_str.unwrap().as_string().unwrap() == "cat");
     }
 
     #[test]
     fn test_find_path(){
-        let json_value = from_str("{\"dog\":{\"cat\": {\"mouse\" : \"cheese\"}}}").unwrap();
+        let json_value = Json::from_str("{\"dog\":{\"cat\": {\"mouse\" : \"cheese\"}}}").unwrap();
         let found_str = json_value.find_path(&["dog", "cat", "mouse"]);
         assert!(found_str.unwrap().as_string().unwrap() == "cheese");
     }
 
     #[test]
     fn test_search(){
-        let json_value = from_str("{\"dog\":{\"cat\": {\"mouse\" : \"cheese\"}}}").unwrap();
+        let json_value = Json::from_str("{\"dog\":{\"cat\": {\"mouse\" : \"cheese\"}}}").unwrap();
         let found_str = json_value.search("mouse").and_then(|j| j.as_string());
         assert!(found_str.unwrap() == "cheese");
     }
 
     #[test]
     fn test_index(){
-        let json_value = from_str("{\"animals\":[\"dog\",\"cat\",\"mouse\"]}").unwrap();
+        let json_value = Json::from_str("{\"animals\":[\"dog\",\"cat\",\"mouse\"]}").unwrap();
         let ref array = json_value["animals"];
         assert_eq!(array[0].as_string().unwrap(), "dog");
         assert_eq!(array[1].as_string().unwrap(), "cat");
@@ -3182,26 +3182,26 @@ mod tests {
 
     #[test]
     fn test_is_object(){
-        let json_value = from_str("{}").unwrap();
+        let json_value = Json::from_str("{}").unwrap();
         assert!(json_value.is_object());
     }
 
     #[test]
     fn test_as_object(){
-        let json_value = from_str("{}").unwrap();
+        let json_value = Json::from_str("{}").unwrap();
         let json_object = json_value.as_object();
         assert!(json_object.is_some());
     }
 
     #[test]
     fn test_is_array(){
-        let json_value = from_str("[1, 2, 3]").unwrap();
+        let json_value = Json::from_str("[1, 2, 3]").unwrap();
         assert!(json_value.is_array());
     }
 
     #[test]
     fn test_as_array(){
-        let json_value = from_str("[1, 2, 3]").unwrap();
+        let json_value = Json::from_str("[1, 2, 3]").unwrap();
         let json_array = json_value.as_array();
         let expected_length = 3;
         assert!(json_array.is_some() && json_array.unwrap().len() == expected_length);
@@ -3209,13 +3209,13 @@ mod tests {
 
     #[test]
     fn test_is_string(){
-        let json_value = from_str("\"dog\"").unwrap();
+        let json_value = Json::from_str("\"dog\"").unwrap();
         assert!(json_value.is_string());
     }
 
     #[test]
     fn test_as_string(){
-        let json_value = from_str("\"dog\"").unwrap();
+        let json_value = Json::from_str("\"dog\"").unwrap();
         let json_str = json_value.as_string();
         let expected_str = "dog";
         assert_eq!(json_str, Some(expected_str));
@@ -3223,79 +3223,79 @@ mod tests {
 
     #[test]
     fn test_is_number(){
-        let json_value = from_str("12").unwrap();
+        let json_value = Json::from_str("12").unwrap();
         assert!(json_value.is_number());
     }
 
     #[test]
     fn test_is_i64(){
-        let json_value = from_str("-12").unwrap();
+        let json_value = Json::from_str("-12").unwrap();
         assert!(json_value.is_i64());
 
-        let json_value = from_str("12").unwrap();
+        let json_value = Json::from_str("12").unwrap();
         assert!(!json_value.is_i64());
 
-        let json_value = from_str("12.0").unwrap();
+        let json_value = Json::from_str("12.0").unwrap();
         assert!(!json_value.is_i64());
     }
 
     #[test]
     fn test_is_u64(){
-        let json_value = from_str("12").unwrap();
+        let json_value = Json::from_str("12").unwrap();
         assert!(json_value.is_u64());
 
-        let json_value = from_str("-12").unwrap();
+        let json_value = Json::from_str("-12").unwrap();
         assert!(!json_value.is_u64());
 
-        let json_value = from_str("12.0").unwrap();
+        let json_value = Json::from_str("12.0").unwrap();
         assert!(!json_value.is_u64());
     }
 
     #[test]
     fn test_is_f64(){
-        let json_value = from_str("12").unwrap();
+        let json_value = Json::from_str("12").unwrap();
         assert!(!json_value.is_f64());
 
-        let json_value = from_str("-12").unwrap();
+        let json_value = Json::from_str("-12").unwrap();
         assert!(!json_value.is_f64());
 
-        let json_value = from_str("12.0").unwrap();
+        let json_value = Json::from_str("12.0").unwrap();
         assert!(json_value.is_f64());
 
-        let json_value = from_str("-12.0").unwrap();
+        let json_value = Json::from_str("-12.0").unwrap();
         assert!(json_value.is_f64());
     }
 
     #[test]
     fn test_as_i64(){
-        let json_value = from_str("-12").unwrap();
+        let json_value = Json::from_str("-12").unwrap();
         let json_num = json_value.as_i64();
         assert_eq!(json_num, Some(-12));
     }
 
     #[test]
     fn test_as_u64(){
-        let json_value = from_str("12").unwrap();
+        let json_value = Json::from_str("12").unwrap();
         let json_num = json_value.as_u64();
         assert_eq!(json_num, Some(12));
     }
 
     #[test]
     fn test_as_f64(){
-        let json_value = from_str("12.0").unwrap();
+        let json_value = Json::from_str("12.0").unwrap();
         let json_num = json_value.as_f64();
         assert_eq!(json_num, Some(12f64));
     }
 
     #[test]
     fn test_is_boolean(){
-        let json_value = from_str("false").unwrap();
+        let json_value = Json::from_str("false").unwrap();
         assert!(json_value.is_boolean());
     }
 
     #[test]
     fn test_as_boolean(){
-        let json_value = from_str("false").unwrap();
+        let json_value = Json::from_str("false").unwrap();
         let json_bool = json_value.as_boolean();
         let expected_bool = false;
         assert!(json_bool.is_some() && json_bool.unwrap() == expected_bool);
@@ -3303,13 +3303,13 @@ mod tests {
 
     #[test]
     fn test_is_null(){
-        let json_value = from_str("null").unwrap();
+        let json_value = Json::from_str("null").unwrap();
         assert!(json_value.is_null());
     }
 
     #[test]
     fn test_as_null(){
-        let json_value = from_str("null").unwrap();
+        let json_value = Json::from_str("null").unwrap();
         let json_null = json_value.as_null();
         let expected_null = ();
         assert!(json_null.is_some() && json_null.unwrap() == expected_null);
@@ -3328,7 +3328,7 @@ mod tests {
             hm.encode(&mut encoder).unwrap();
         }
         let json_str = from_utf8(mem_buf[]).unwrap();
-        match from_str(json_str) {
+        match Json::from_str(json_str) {
             Err(_) => panic!("Unable to parse json_str: {}", json_str),
             _ => {} // it parsed and we are good to go
         }
@@ -3347,7 +3347,7 @@ mod tests {
             hm.encode(&mut encoder).unwrap()
         }
         let json_str = from_utf8(mem_buf[]).unwrap();
-        match from_str(json_str) {
+        match Json::from_str(json_str) {
             Err(_) => panic!("Unable to parse json_str: {}", json_str),
             _ => {} // it parsed and we are good to go
         }
@@ -3404,7 +3404,7 @@ mod tests {
             assert_eq!(indents(lines[6]), 0 * i); // ]
 
             // Finally, test that the pretty-printed JSON is valid
-            from_str(printed).ok().expect("Pretty-printed JSON is invalid!");
+            Json::from_str(printed).ok().expect("Pretty-printed JSON is invalid!");
         }
     }
 
@@ -3413,7 +3413,7 @@ mod tests {
         use std::collections::HashMap;
         use Decodable;
         let json_str = "{\"1\":true}";
-        let json_obj = match from_str(json_str) {
+        let json_obj = match Json::from_str(json_str) {
             Err(_) => panic!("Unable to parse json_str: {}", json_str),
             Ok(o) => o
         };
@@ -3426,7 +3426,7 @@ mod tests {
         use std::collections::HashMap;
         use Decodable;
         let json_str = "{\"a\":true}";
-        let json_obj = match from_str(json_str) {
+        let json_obj = match Json::from_str(json_str) {
             Err(_) => panic!("Unable to parse json_str: {}", json_str),
             Ok(o) => o
         };
@@ -3635,11 +3635,11 @@ mod tests {
 
         assert_eq!(last_event("["), Error(SyntaxError(EOFWhileParsingValue, 1,  2)));
 
-        assert_eq!(from_str("["),     Err(SyntaxError(EOFWhileParsingValue, 1, 2)));
-        assert_eq!(from_str("[1"),    Err(SyntaxError(EOFWhileParsingArray, 1, 3)));
-        assert_eq!(from_str("[1,"),   Err(SyntaxError(EOFWhileParsingValue, 1, 4)));
-        assert_eq!(from_str("[1,]"),  Err(SyntaxError(InvalidSyntax,        1, 4)));
-        assert_eq!(from_str("[6 7]"), Err(SyntaxError(InvalidSyntax,        1, 4)));
+        assert_eq!(Json::from_str("["),     Err(SyntaxError(EOFWhileParsingValue, 1, 2)));
+        assert_eq!(Json::from_str("[1"),    Err(SyntaxError(EOFWhileParsingArray, 1, 3)));
+        assert_eq!(Json::from_str("[1,"),   Err(SyntaxError(EOFWhileParsingValue, 1, 4)));
+        assert_eq!(Json::from_str("[1,]"),  Err(SyntaxError(InvalidSyntax,        1, 4)));
+        assert_eq!(Json::from_str("[6 7]"), Err(SyntaxError(InvalidSyntax,        1, 4)));
 
     }
     #[test]
@@ -3801,7 +3801,7 @@ mod tests {
     #[bench]
     fn bench_small(b: &mut Bencher) {
         b.iter( || {
-            let _ = from_str(r#"{
+            let _ = Json::from_str(r#"{
                 "a": 1.0,
                 "b": [
                     true,
@@ -3838,6 +3838,6 @@ mod tests {
     #[bench]
     fn bench_large(b: &mut Bencher) {
         let src = big_json();
-        b.iter( || { let _ = from_str(src.as_slice()); });
+        b.iter( || { let _ = Json::from_str(src.as_slice()); });
     }
 }
