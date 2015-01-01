@@ -3376,7 +3376,7 @@ mod tests {
 
         // Helper function for counting indents
         fn indents(source: &str) -> uint {
-            let trimmed = source.trim_left_chars(' ');
+            let trimmed = source.trim_left_matches(' ');
             source.len() - trimmed.len()
         }
 
