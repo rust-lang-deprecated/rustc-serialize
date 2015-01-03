@@ -60,7 +60,7 @@
 //! To be able to encode a piece of data, it must implement the `serialize::RustcEncodable` trait.
 //! To be able to decode a piece of data, it must implement the `serialize::RustcDecodable` trait.
 //! The Rust compiler provides an annotation to automatically generate the code for these traits:
-//! `#[deriving(RustcDecodable, RustcEncodable)]`
+//! `#[derive(RustcDecodable, RustcEncodable)]`
 //!
 //! The JSON API provides an enum `json::Json` and a trait `ToJson` to encode objects.
 //! The `ToJson` trait provides a `to_json` method to convert an object into a `json::Json` value.
@@ -77,11 +77,12 @@
 //! serialization API, using the derived serialization code.
 //!
 //! ```rust
+//! # #![feature(old_orphan_check)]
 //! extern crate serialize;
 //! use serialize::json;
 //!
 //! // Automatically generate `Decodable` and `Encodable` trait implementations
-//! #[deriving(Decodable, Encodable)]
+//! #[derive(Decodable, Encodable)]
 //! pub struct TestStruct  {
 //!     data_int: u8,
 //!     data_str: String,
@@ -111,8 +112,9 @@
 //! ### Simple example of `ToJson` usage
 //!
 //! ```rust
+//! # #![feature(old_orphan_check)]
 //! extern crate serialize;
-//! use serialize::json::{mod, ToJson, Json};
+//! use serialize::json::{self, ToJson, Json};
 //!
 //! // A custom data structure
 //! struct ComplexNum {
@@ -128,7 +130,7 @@
 //! }
 //!
 //! // Only generate `RustcEncodable` trait implementation
-//! #[deriving(Encodable)]
+//! #[derive(Encodable)]
 //! pub struct ComplexNumRecord {
 //!     uid: u8,
 //!     dsc: String,
@@ -150,12 +152,13 @@
 //! ### Verbose example of `ToJson` usage
 //!
 //! ```rust
+//! # #![feature(old_orphan_check)]
 //! extern crate serialize;
 //! use std::collections::BTreeMap;
-//! use serialize::json::{mod, Json, ToJson};
+//! use serialize::json::{self, Json, ToJson};
 //!
 //! // Only generate `Decodable` trait implementation
-//! #[deriving(Decodable)]
+//! #[derive(Decodable)]
 //! pub struct TestStruct {
 //!     data_int: u8,
 //!     data_str: String,
@@ -211,7 +214,7 @@ use unicode::str::Utf16Item;
 use Encodable;
 
 /// Represents a json value
-#[deriving(Clone, PartialEq, PartialOrd)]
+#[derive(Clone, PartialEq, PartialOrd)]
 pub enum Json {
     I64(i64),
     U64(u64),
@@ -227,7 +230,7 @@ pub type Array = Vec<Json>;
 pub type Object = BTreeMap<string::String, Json>;
 
 /// The errors that can arise while parsing a JSON stream.
-#[deriving(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum ErrorCode {
     InvalidSyntax,
     InvalidNumber,
@@ -248,7 +251,7 @@ pub enum ErrorCode {
     NotUtf8,
 }
 
-#[deriving(Clone, Copy, PartialEq, Show)]
+#[derive(Clone, Copy, PartialEq, Show)]
 pub enum ParserError {
     /// msg, line, col
     SyntaxError(ErrorCode, uint, uint),
@@ -258,7 +261,7 @@ pub enum ParserError {
 // Builder and Parser have the same errors.
 pub type BuilderError = ParserError;
 
-#[deriving(Clone, PartialEq, Show)]
+#[derive(Clone, PartialEq, Show)]
 pub enum DecoderError {
     ParseError(ParserError),
     ExpectedError(string::String, string::String),
@@ -955,6 +958,13 @@ impl Json {
         self.encode(&mut encoder)
     }
 
+    /// Encodes a json value into a string
+    fn to_str(&self) -> string::String {
+        let mut s = Vec::new();
+        self.to_writer(&mut s as &mut io::Writer).unwrap();
+        string::String::from_utf8(s).unwrap()
+    }
+
     /// Encodes a json value into an io::writer.
     /// Pretty-prints in a more readable format.
     pub fn to_pretty_writer(&self, writer: &mut io::Writer) -> EncodeResult {
@@ -962,7 +972,7 @@ impl Json {
         self.encode(&mut encoder)
     }
 
-    /// Encodes a json value into a string
+    /// Encodes a json value into a pretty string
     pub fn to_pretty_str(&self) -> string::String {
         let mut s = Vec::new();
         self.to_pretty_writer(&mut s as &mut io::Writer).unwrap();
@@ -1165,7 +1175,7 @@ impl ops::Index<uint, Json> for Json {
 }
 
 /// The output of the streaming parser.
-#[deriving(PartialEq, Clone, Show)]
+#[derive(PartialEq, Clone, Show)]
 pub enum JsonEvent {
     ObjectStart,
     ObjectEnd,
@@ -1180,7 +1190,7 @@ pub enum JsonEvent {
     Error(ParserError),
 }
 
-#[deriving(PartialEq, Show)]
+#[derive(PartialEq, Show)]
 enum ParserState {
     // Parse a value in an array, true means first element.
     ParseArray(bool),
@@ -1209,7 +1219,7 @@ pub struct Stack {
 /// StackElements compose a Stack.
 /// For example, Key("foo"), Key("bar"), Index(3) and Key("x") are the
 /// StackElements compositing the stack that represents foo.bar[3].x
-#[deriving(PartialEq, Clone, Show)]
+#[derive(PartialEq, Clone, Show)]
 pub enum StackElement<'l> {
     Index(u32),
     Key(&'l str),
@@ -1217,7 +1227,7 @@ pub enum StackElement<'l> {
 
 // Internally, Key elements are stored as indices in a buffer to avoid
 // allocating a string for every member of an object.
-#[deriving(PartialEq, Clone, Show)]
+#[derive(PartialEq, Clone, Show)]
 enum InternalStackElement {
     InternalIndex(u32),
     InternalKey(u16, u16), // start, size
@@ -2430,7 +2440,7 @@ impl<A:ToJson> ToJson for Option<A> {
 impl fmt::Show for Json {
     /// Encodes a json value into a string
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.to_writer(f).map_err(|_| fmt::Error)
+        f.write_str(self.to_str().as_slice()).map_err(|_| fmt::Error)
     }
 }
 
@@ -2460,7 +2470,7 @@ mod tests {
     use std::num::Float;
     use std::string;
 
-    #[deriving(RustcDecodable, Eq, PartialEq, Show)]
+    #[derive(RustcDecodable, Eq, PartialEq, Show)]
     struct OptionData {
         opt: Option<uint>,
     }
@@ -2487,20 +2497,20 @@ mod tests {
                                 ExpectedError("Number".to_string(), "false".to_string()));
     }
 
-    #[deriving(PartialEq, RustcEncodable, RustcDecodable, Show)]
+    #[derive(PartialEq, RustcEncodable, RustcDecodable, Show)]
     enum Animal {
         Dog,
         Frog(string::String, int)
     }
 
-    #[deriving(PartialEq, RustcEncodable, RustcDecodable, Show)]
+    #[derive(PartialEq, RustcEncodable, RustcDecodable, Show)]
     struct Inner {
         a: (),
         b: uint,
         c: Vec<string::String>,
     }
 
-    #[deriving(PartialEq, RustcEncodable, RustcDecodable, Show)]
+    #[derive(PartialEq, RustcEncodable, RustcDecodable, Show)]
     struct Outer {
         inner: Vec<Inner>,
     }
@@ -3044,7 +3054,7 @@ mod tests {
         );
     }
 
-    #[deriving(RustcDecodable)]
+    #[derive(RustcDecodable)]
     struct FloatStruct {
         f: f64,
         a: Vec<f64>
@@ -3093,7 +3103,7 @@ mod tests {
             Err(SyntaxError(EOFWhileParsingObject, 3u, 8u)));
     }
 
-    #[deriving(RustcDecodable)]
+    #[derive(RustcDecodable)]
     #[allow(dead_code)]
     struct DecodeStruct {
         x: f64,
@@ -3101,7 +3111,7 @@ mod tests {
         z: string::String,
         w: Vec<DecodeStruct>
     }
-    #[deriving(RustcDecodable)]
+    #[derive(RustcDecodable)]
     enum DecodeEnum {
         A(f64),
         B(string::String)
