@@ -1144,13 +1144,17 @@ impl Json {
     }
 }
 
-impl<'a> ops::Index<&'a str, Json>  for Json {
+impl<'a> ops::Index<&'a str>  for Json {
+    type Output = Json;
+
     fn index(&self, idx: & &str) -> &Json {
         self.find(*idx).unwrap()
     }
 }
 
-impl ops::Index<uint, Json> for Json {
+impl ops::Index<uint> for Json {
+    type Output = Json;
+
     fn index<'a>(&'a self, idx: &uint) -> &'a Json {
         match self {
             &Json::Array(ref v) => v.index(idx),
@@ -1345,7 +1349,9 @@ pub struct Parser<T> {
     state: ParserState,
 }
 
-impl<T: Iterator<char>> Iterator<JsonEvent> for Parser<T> {
+impl<T: Iterator<Item = char>> Iterator for Parser<T> {
+    type Item = JsonEvent;
+
     fn next(&mut self) -> Option<JsonEvent> {
         if self.state == ParseFinished {
             return None;
@@ -1366,7 +1372,7 @@ impl<T: Iterator<char>> Iterator<JsonEvent> for Parser<T> {
     }
 }
 
-impl<T: Iterator<char>> Parser<T> {
+impl<T: Iterator<Item = char>> Parser<T> {
     /// Creates the JSON parser.
     pub fn new(rdr: T) -> Parser<T> {
         let mut p = Parser {
@@ -1888,7 +1894,7 @@ pub struct Builder<T> {
     token: Option<JsonEvent>,
 }
 
-impl<T: Iterator<char>> Builder<T> {
+impl<T: Iterator<Item = char>> Builder<T> {
     /// Create a JSON Builder.
     pub fn new(src: T) -> Builder<T> {
         Builder { parser: Parser::new(src), token: None, }
