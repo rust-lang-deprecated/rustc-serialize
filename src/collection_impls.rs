@@ -16,7 +16,6 @@ use std::hash::{Hash, Hasher};
 
 use {Decodable, Encodable, Decoder, Encoder};
 use std::collections::{DList, RingBuf, BTreeMap, BTreeSet, HashMap, HashSet, VecMap};
-use std::collections::enum_set::{EnumSet, CLike};
 
 impl<
     E,
@@ -140,37 +139,6 @@ impl<
             }
             Ok(set)
         })
-    }
-}
-
-impl<
-    E,
-    S: Encoder<E>,
-    T: Encodable<S, E> + CLike
-> Encodable<S, E> for EnumSet<T> {
-    fn encode(&self, s: &mut S) -> Result<(), E> {
-        let mut bits = 0;
-        for item in self.iter() {
-            bits |= item.to_uint();
-        }
-        s.emit_uint(bits)
-    }
-}
-
-impl<
-    E,
-    D: Decoder<E>,
-    T: Decodable<D, E> + CLike
-> Decodable<D, E> for EnumSet<T> {
-    fn decode(d: &mut D) -> Result<EnumSet<T>, E> {
-        let bits = try!(d.read_uint());
-        let mut set = EnumSet::new();
-        for bit in range(0, uint::BITS) {
-            if bits & (1 << bit) != 0 {
-                set.insert(CLike::from_uint(1 << bit));
-            }
-        }
-        Ok(set)
     }
 }
 
