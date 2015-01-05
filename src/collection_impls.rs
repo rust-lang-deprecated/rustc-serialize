@@ -10,7 +10,6 @@
 
 //! Implementations of serialization for structures found in libcollections
 
-use std::uint;
 use std::default::Default;
 use std::hash::{Hash, Hasher};
 
