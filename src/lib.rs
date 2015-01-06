@@ -22,8 +22,6 @@ extern crate test;
 
 extern crate unicode;
 
-extern crate collections;
-
 pub use self::serialize::{Decoder, Encoder, Decodable, Encodable,
                           DecoderHelpers, EncoderHelpers};
 
