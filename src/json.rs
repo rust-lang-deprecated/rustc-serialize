@@ -78,11 +78,13 @@
 //!
 //! ```rust
 //! # #![feature(old_orphan_check)]
-//! extern crate serialize;
-//! use serialize::json;
+//! # #![allow(staged_unstable)]
+//! # #![allow(staged_experimental)]
+//! extern crate "rustc-serialize" as rustc_serialize;
+//! use rustc_serialize::json;
 //!
-//! // Automatically generate `Decodable` and `Encodable` trait implementations
-//! #[derive(Decodable, Encodable)]
+//! // Automatically generate `RustcDecodable` and `RustcEncodable` trait implementations
+//! #[derive(RustcDecodable, RustcEncodable)]
 //! pub struct TestStruct  {
 //!     data_int: u8,
 //!     data_str: String,
@@ -113,8 +115,10 @@
 //!
 //! ```rust
 //! # #![feature(old_orphan_check)]
-//! extern crate serialize;
-//! use serialize::json::{self, ToJson, Json};
+//! # #![allow(staged_unstable)]
+//! # #![allow(staged_experimental)]
+//! extern crate "rustc-serialize" as rustc_serialize;
+//! use rustc_serialize::json::{self, ToJson, Json};
 //!
 //! // A custom data structure
 //! struct ComplexNum {
@@ -130,7 +134,7 @@
 //! }
 //!
 //! // Only generate `RustcEncodable` trait implementation
-//! #[derive(Encodable)]
+//! #[derive(RustcEncodable)]
 //! pub struct ComplexNumRecord {
 //!     uid: u8,
 //!     dsc: String,
@@ -153,12 +157,14 @@
 //!
 //! ```rust
 //! # #![feature(old_orphan_check)]
-//! extern crate serialize;
+//! # #![allow(staged_unstable)]
+//! # #![allow(staged_experimental)]
+//! extern crate "rustc-serialize" as rustc_serialize;
 //! use std::collections::BTreeMap;
-//! use serialize::json::{self, Json, ToJson};
+//! use rustc_serialize::json::{self, Json, ToJson};
 //!
 //! // Only generate `Decodable` trait implementation
-//! #[derive(Decodable)]
+//! #[derive(RustcDecodable)]
 //! pub struct TestStruct {
 //!     data_int: u8,
 //!     data_str: String,
@@ -193,7 +199,6 @@
 //! ```
 
 use self::JsonEvent::*;
-use self::StackElement::*;
 use self::ErrorCode::*;
 use self::ParserError::*;
 use self::DecoderError::*;
@@ -207,14 +212,14 @@ use std::mem::{swap, transmute};
 use std::num::{Float, Int};
 use std::str::{FromStr};
 use std::string;
-use std::ops;
+use std::ops::Index;
 use unicode::str as unicode_str;
 use unicode::str::Utf16Item;
 
 use Encodable;
 
 /// Represents a json value
-#[derive(Clone, PartialEq, PartialOrd)]
+#[derive(Clone, PartialEq, PartialOrd, Show)]
 pub enum Json {
     I64(i64),
     U64(u64),
@@ -331,7 +336,7 @@ fn io_error_to_error(io: io::IoError) -> ParserError {
 
 impl std::error::Error for DecoderError {
     fn description(&self) -> &str { "decoder error" }
-    fn detail(&self) -> Option<std::string::String> { Some(self.to_string()) }
+    fn detail(&self) -> Option<std::string::String> { Some(format!("{:?}", self)) }
 }
 
 pub type EncodeResult = Result<(), fmt::Error>;
@@ -383,7 +388,7 @@ fn escape_str(wr: &mut fmt::Writer, v: &str) -> fmt::Result {
         };
 
         if start < i {
-            try!(wr.write_str(v[start..i]));
+            try!(wr.write_str(&v[start..i]));
         }
 
         try!(wr.write_str(escaped));
@@ -392,7 +397,7 @@ fn escape_str(wr: &mut fmt::Writer, v: &str) -> fmt::Result {
     }
 
     if start != v.len() {
-        try!(wr.write_str(v[start..]));
+        try!(wr.write_str(&v[start..]));
     }
 
     wr.write_str("\"")
@@ -401,7 +406,7 @@ fn escape_str(wr: &mut fmt::Writer, v: &str) -> fmt::Result {
 fn escape_char(writer: &mut fmt::Writer, v: char) -> fmt::Result {
     let mut buf = [0; 4];
     let n = v.encode_utf8(&mut buf).unwrap();
-    let buf = unsafe { str::from_utf8_unchecked(buf[0..n]) };
+    let buf = unsafe { str::from_utf8_unchecked(&buf[0..n]) };
     escape_str(writer, buf)
 }
 
@@ -414,7 +419,7 @@ fn spaces(wr: &mut fmt::Writer, mut n: uint) -> fmt::Result {
     }
 
     if n > 0 {
-        wr.write_str(BUF[..n])
+        wr.write_str(&BUF[..n])
     } else {
         Ok(())
     }
@@ -624,7 +629,7 @@ impl<'a> ::Encoder for Encoder<'a> {
             let mut check_encoder = Encoder::new(&mut buf);
             try!(f(transmute(&mut check_encoder)));
         }
-        let out = str::from_utf8(buf[]).unwrap();
+        let out = str::from_utf8(&buf[]).unwrap();
         let needs_wrapping = out.char_at(0) != '"' && out.char_at_reverse(out.len()) != '"';
         if needs_wrapping { try!(write!(self.writer, "\"")); }
         try!(f(self));
@@ -895,7 +900,7 @@ impl<'a> ::Encoder for PrettyEncoder<'a> {
             let mut check_encoder = PrettyEncoder::new(&mut buf);
             try!(f(transmute(&mut check_encoder)));
         }
-        let out = str::from_utf8(buf[]).unwrap();
+        let out = str::from_utf8(&buf[]).unwrap();
         let needs_wrapping = out.char_at(0) != '"' && out.char_at_reverse(out.len()) != '"';
         if needs_wrapping { try!(write!(self.writer, "\"")); }
         try!(f(self));
@@ -1048,7 +1053,7 @@ impl Json {
     /// Returns None otherwise.
     pub fn as_string<'a>(&'a self) -> Option<&'a str> {
         match *self {
-            Json::String(ref s) => Some(s[]),
+            Json::String(ref s) => Some(&s[]),
             _ => None
         }
     }
@@ -1145,7 +1150,7 @@ impl Json {
     }
 }
 
-impl<'a> ops::Index<&'a str>  for Json {
+impl<'a> Index<&'a str>  for Json {
     type Output = Json;
 
     fn index(&self, idx: & &str) -> &Json {
@@ -1153,7 +1158,7 @@ impl<'a> ops::Index<&'a str>  for Json {
     }
 }
 
-impl ops::Index<uint> for Json {
+impl Index<uint> for Json {
     type Output = Json;
 
     fn index<'a>(&'a self, idx: &uint) -> &'a Json {
@@ -1239,10 +1244,10 @@ impl Stack {
     /// at the top.
     pub fn get<'l>(&'l self, idx: uint) -> StackElement<'l> {
         match self.stack[idx] {
-            InternalIndex(i) => Index(i),
+            InternalIndex(i) => StackElement::Index(i),
             InternalKey(start, size) => {
-                Key(str::from_utf8(
-                    self.str_buffer[start as uint .. start as uint + size as uint]).unwrap())
+                StackElement::Key(str::from_utf8(
+                    &self.str_buffer[start as uint .. start as uint + size as uint]).unwrap())
             }
         }
     }
@@ -1281,10 +1286,10 @@ impl Stack {
     pub fn top<'l>(&'l self) -> Option<StackElement<'l>> {
         return match self.stack.last() {
             None => None,
-            Some(&InternalIndex(i)) => Some(Index(i)),
+            Some(&InternalIndex(i)) => Some(StackElement::Index(i)),
             Some(&InternalKey(start, size)) => {
-                Some(Key(str::from_utf8(
-                    self.str_buffer[start as uint .. (start+size) as uint]
+                Some(StackElement::Key(str::from_utf8(
+                    &self.str_buffer[start as uint .. (start+size) as uint]
                 ).unwrap()))
             }
         }
@@ -1415,7 +1420,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
         self.ch == Some(c)
     }
 
-    fn error<T>(&self, reason: ErrorCode) -> Result<T, ParserError> {
+    fn error<E>(&self, reason: ErrorCode) -> Result<E, ParserError> {
         Err(SyntaxError(reason, self.line, self.col))
     }
 
@@ -1909,7 +1914,7 @@ impl<T: Iterator<Item = char>> Builder<T> {
         match self.token {
             None => {}
             Some(Error(e)) => { return Err(e); }
-            ref tok => { panic!("unexpected token {}", tok.clone()); }
+            ref tok => { panic!("unexpected token {:?}", tok.clone()); }
         }
         result
     }
@@ -1968,7 +1973,7 @@ impl<T: Iterator<Item = char>> Builder<T> {
                 _ => {}
             }
             let key = match self.parser.stack().top() {
-                Some(Key(k)) => { k.to_string() }
+                Some(StackElement::Key(k)) => { k.to_string() }
                 _ => { panic!("invalid state"); }
             };
             match self.build_value() {
@@ -2143,7 +2148,7 @@ impl ::Decoder for Decoder {
                 return Err(ExpectedError("String or Object".to_string(), format!("{}", json)))
             }
         };
-        let idx = match names.iter().position(|n| *n == name[]) {
+        let idx = match names.iter().position(|n| *n == &name[]) {
             Some(idx) => idx,
             None => return Err(UnknownVariantError(name))
         };
@@ -2440,7 +2445,8 @@ impl<'a, 'b> fmt::Writer for FormatShim<'a, 'b> {
         self.inner.write_str(s)
     }
 }
-impl fmt::Show for Json {
+
+impl fmt::String for Json {
     /// Encodes a json value into a string
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut shim = FormatShim { inner: f };
@@ -2449,7 +2455,7 @@ impl fmt::Show for Json {
     }
 }
 
-impl<'a> fmt::Show for PrettyJson<'a> {
+impl<'a> fmt::String for PrettyJson<'a> {
     /// Encodes a json value into a string
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut shim = FormatShim { inner: f };
@@ -2458,7 +2464,7 @@ impl<'a> fmt::Show for PrettyJson<'a> {
     }
 }
 
-impl<'a, T: Encodable> fmt::Show for AsJson<'a, T> {
+impl<'a, T: Encodable> fmt::String for AsJson<'a, T> {
     /// Encodes a json value into a string
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut shim = FormatShim { inner: f };
@@ -2475,7 +2481,7 @@ impl<'a, T> AsPrettyJson<'a, T> {
     }
 }
 
-impl<'a, T: Encodable> fmt::Show for AsPrettyJson<'a, T> {
+impl<'a, T: Encodable> fmt::String for AsPrettyJson<'a, T> {
     /// Encodes a json value into a string
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut shim = FormatShim { inner: f };
@@ -3141,9 +3147,9 @@ mod tests {
             Ok(json) => Decodable::decode(&mut Decoder::new(json))
         };
         match res {
-            Ok(_) => panic!("`{}` parsed & decoded ok, expecting error `{}`",
+            Ok(_) => panic!("`{:?}` parsed & decoded ok, expecting error `{:?}`",
                               to_parse, expected),
-            Err(ParseError(e)) => panic!("`{}` is not valid json: {}",
+            Err(ParseError(e)) => panic!("`{}` is not valid json: {:?}",
                                            to_parse, e),
             Err(e) => {
                 assert_eq!(e, expected);
@@ -3352,7 +3358,7 @@ mod tests {
         hm.insert(1, true);
         let mut mem_buf = Vec::new();
         write!(&mut mem_buf, "{}", super::as_pretty_json(&hm)).unwrap();
-        let json_str = from_utf8(mem_buf[]).unwrap();
+        let json_str = from_utf8(&mem_buf[]).unwrap();
         match Json::from_str(json_str) {
             Err(_) => panic!("Unable to parse json_str: {}", json_str),
             _ => {} // it parsed and we are good to go
@@ -3368,7 +3374,7 @@ mod tests {
         hm.insert(1, true);
         let mut mem_buf = Vec::new();
         write!(&mut mem_buf, "{}", super::as_pretty_json(&hm)).unwrap();
-        let json_str = from_utf8(mem_buf[]).unwrap();
+        let json_str = from_utf8(&mem_buf[]).unwrap();
         match Json::from_str(json_str) {
             Err(_) => panic!("Unable to parse json_str: {}", json_str),
             _ => {} // it parsed and we are good to go
@@ -3408,7 +3414,7 @@ mod tests {
             write!(&mut writer, "{}",
                    super::as_pretty_json(&json).indent(i)).unwrap();
 
-            let printed = from_utf8(writer[]).unwrap();
+            let printed = from_utf8(&writer[]).unwrap();
 
             // Check for indents at each line
             let lines: Vec<&str> = printed.lines().collect();
@@ -3465,7 +3471,7 @@ mod tests {
             };
             let (ref expected_evt, ref expected_stack) = expected[i];
             if !parser.stack().is_equal_to(expected_stack.as_slice()) {
-                panic!("Parser stack is not equal to {}", expected_stack);
+                panic!("Parser stack is not equal to {:?}", expected_stack);
             }
             assert_eq!(&evt, expected_evt);
             i+=1;
