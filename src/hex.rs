@@ -32,8 +32,9 @@ impl ToHex for [u8] {
     /// # Example
     ///
     /// ```rust
-    /// extern crate serialize;
-    /// use serialize::hex::ToHex;
+    /// # #![allow(staged_unstable)]
+    /// extern crate "rustc-serialize" as rustc_serialize;
+    /// use rustc_serialize::hex::ToHex;
     ///
     /// fn main () {
     ///     let str = [52,32].to_hex();
@@ -88,7 +89,7 @@ impl error::Error for FromHexError {
     }
 
     fn detail(&self) -> Option<String> {
-        Some(self.to_string())
+        Some(format!("{:?}", self))
     }
 }
 
@@ -105,14 +106,15 @@ impl FromHex for str {
     /// This converts a string literal to hexadecimal and back.
     ///
     /// ```rust
-    /// extern crate serialize;
-    /// use serialize::hex::{FromHex, ToHex};
+    /// # #![allow(staged_unstable)]
+    /// extern crate "rustc-serialize" as rustc_serialize;
+    /// use rustc_serialize::hex::{FromHex, ToHex};
     ///
     /// fn main () {
     ///     let hello_str = "Hello, World".as_bytes().to_hex();
     ///     println!("{}", hello_str);
     ///     let bytes = hello_str.as_slice().from_hex().unwrap();
-    ///     println!("{}", bytes);
+    ///     println!("{:?}", bytes);
     ///     let result_str = String::from_utf8(bytes).unwrap();
     ///     println!("{}", result_str);
     /// }

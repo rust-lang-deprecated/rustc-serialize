@@ -82,12 +82,13 @@ impl ToBase64 for [u8] {
     /// # Example
     ///
     /// ```rust
-    /// extern crate serialize;
-    /// use serialize::base64::{ToBase64, STANDARD};
+    /// # #![allow(staged_unstable)]
+    /// extern crate "rustc-serialize" as rustc_serialize;
+    /// use rustc_serialize::base64::{ToBase64, STANDARD};
     ///
     /// fn main () {
     ///     let str = [52,32].to_base64(STANDARD);
-    ///     println!("base 64 output: {}", str);
+    ///     println!("base 64 output: {:?}", str);
     /// }
     /// ```
     fn to_base64(&self, config: Config) -> String {
@@ -204,7 +205,7 @@ impl error::Error for FromBase64Error {
     }
 
     fn detail(&self) -> Option<String> {
-        Some(self.to_string())
+        Some(format!("{:?}", self))
     }
 }
 
@@ -220,8 +221,10 @@ impl FromBase64 for str {
     /// This converts a string literal to base64 and back.
     ///
     /// ```rust
-    /// extern crate serialize;
-    /// use serialize::base64::{ToBase64, FromBase64, STANDARD};
+    /// # #![allow(staged_unstable)]
+    /// # #![allow(staged_experimental)]
+    /// extern crate "rustc-serialize" as rustc_serialize;
+    /// use rustc_serialize::base64::{ToBase64, FromBase64, STANDARD};
     ///
     /// fn main () {
     ///     let hello_str = b"Hello, World".to_base64(STANDARD);
@@ -230,7 +233,7 @@ impl FromBase64 for str {
     ///     if res.is_ok() {
     ///       let opt_bytes = String::from_utf8(res.unwrap());
     ///       if opt_bytes.is_ok() {
-    ///         println!("decoded from base64: {}", opt_bytes.unwrap());
+    ///         println!("decoded from base64: {:?}", opt_bytes.unwrap());
     ///       }
     ///     }
     /// }
