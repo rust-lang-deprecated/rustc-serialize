@@ -46,7 +46,7 @@ pub struct Config {
     /// True to pad output with `=` characters
     pub pad: bool,
     /// `Some(len)` to wrap lines at `len`, `None` to disable line wrapping
-    pub line_length: Option<uint>
+    pub line_length: Option<usize>
 }
 
 /// Configuration for RFC 4648 standard base64 encoding
@@ -82,7 +82,7 @@ impl ToBase64 for [u8] {
     /// # Example
     ///
     /// ```rust
-    /// # #![allow(staged_unstable)]
+    /// # #![allow(unstable)]
     /// extern crate "rustc-serialize" as rustc_serialize;
     /// use rustc_serialize::base64::{ToBase64, STANDARD};
     ///
@@ -123,10 +123,10 @@ impl ToBase64 for [u8] {
                     (third  as u32);
 
             // This 24-bit number gets separated into four 6-bit numbers.
-            v.push(bytes[((n >> 18) & 63) as uint]);
-            v.push(bytes[((n >> 12) & 63) as uint]);
-            v.push(bytes[((n >> 6 ) & 63) as uint]);
-            v.push(bytes[(n & 63) as uint]);
+            v.push(bytes[((n >> 18) & 63) as usize]);
+            v.push(bytes[((n >> 12) & 63) as usize]);
+            v.push(bytes[((n >> 6 ) & 63) as usize]);
+            v.push(bytes[(n & 63) as usize]);
 
             cur_length += 4;
             i += 3;
@@ -146,8 +146,8 @@ impl ToBase64 for [u8] {
             0 => (),
             1 => {
                 let n = (self[i] as u32) << 16;
-                v.push(bytes[((n >> 18) & 63) as uint]);
-                v.push(bytes[((n >> 12) & 63) as uint]);
+                v.push(bytes[((n >> 18) & 63) as usize]);
+                v.push(bytes[((n >> 12) & 63) as usize]);
                 if config.pad {
                     v.push(b'=');
                     v.push(b'=');
@@ -155,10 +155,10 @@ impl ToBase64 for [u8] {
             }
             2 => {
                 let n = (self[i] as u32) << 16 |
-                    (self[i + 1u] as u32) << 8;
-                v.push(bytes[((n >> 18) & 63) as uint]);
-                v.push(bytes[((n >> 12) & 63) as uint]);
-                v.push(bytes[((n >> 6 ) & 63) as uint]);
+                    (self[i + 1] as u32) << 8;
+                v.push(bytes[((n >> 18) & 63) as usize]);
+                v.push(bytes[((n >> 12) & 63) as usize]);
+                v.push(bytes[((n >> 6 ) & 63) as usize]);
                 if config.pad {
                     v.push(b'=');
                 }
@@ -181,7 +181,7 @@ pub trait FromBase64 {
 #[derive(Copy)]
 pub enum FromBase64Error {
     /// The input contained a character not part of the base64 format
-    InvalidBase64Byte(u8, uint),
+    InvalidBase64Byte(u8, usize),
     /// The input had an invalid length
     InvalidBase64Length,
 }
@@ -221,8 +221,7 @@ impl FromBase64 for str {
     /// This converts a string literal to base64 and back.
     ///
     /// ```rust
-    /// # #![allow(staged_unstable)]
-    /// # #![allow(staged_experimental)]
+    /// # #![allow(unstable)]
     /// extern crate "rustc-serialize" as rustc_serialize;
     /// use rustc_serialize::base64::{ToBase64, FromBase64, STANDARD};
     ///
@@ -248,7 +247,7 @@ impl FromBase64 for [u8] {
     fn from_base64(&self) -> Result<Vec<u8>, FromBase64Error> {
         let mut r = Vec::with_capacity(self.len());
         let mut buf: u32 = 0;
-        let mut modulus = 0i;
+        let mut modulus = 0;
 
         let mut it = self.iter().enumerate();
         for (idx, &byte) in it {
@@ -317,7 +316,7 @@ mod tests {
 
     #[test]
     fn test_to_base64_crlf_line_break() {
-        assert!(![0u8; 1000].to_base64(Config {line_length: None, ..STANDARD})
+        assert!(![08; 1000].to_base64(Config {line_length: None, ..STANDARD})
                               .contains("\r\n"));
         assert_eq!(b"foobar".to_base64(Config {line_length: Some(4),
                                                ..STANDARD}),
@@ -326,7 +325,7 @@ mod tests {
 
     #[test]
     fn test_to_base64_lf_line_break() {
-        assert!(![0u8; 1000].to_base64(Config {line_length: None,
+        assert!(![08; 1000].to_base64(Config {line_length: None,
                                                  newline: Newline::LF,
                                                  ..STANDARD})
                               .as_slice()
@@ -397,8 +396,8 @@ mod tests {
     fn test_base64_random() {
         use std::rand::{thread_rng, Rng};
 
-        for _ in range(0u, 1000) {
-            let times = thread_rng().gen_range(1u, 100);
+        for _ in range(0, 1000) {
+            let times = thread_rng().gen_range(1, 100);
             let v = thread_rng().gen_iter::<u8>().take(times)
                                 .collect::<Vec<_>>();
             assert_eq!(v.to_base64(STANDARD)

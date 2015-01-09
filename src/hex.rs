@@ -32,7 +32,7 @@ impl ToHex for [u8] {
     /// # Example
     ///
     /// ```rust
-    /// # #![allow(staged_unstable)]
+    /// # #![allow(unstable)]
     /// extern crate "rustc-serialize" as rustc_serialize;
     /// use rustc_serialize::hex::ToHex;
     ///
@@ -44,8 +44,8 @@ impl ToHex for [u8] {
     fn to_hex(&self) -> String {
         let mut v = Vec::with_capacity(self.len() * 2);
         for &byte in self.iter() {
-            v.push(CHARS[(byte >> 4) as uint]);
-            v.push(CHARS[(byte & 0xf) as uint]);
+            v.push(CHARS[(byte >> 4) as usize]);
+            v.push(CHARS[(byte & 0xf) as usize]);
         }
 
         unsafe {
@@ -65,7 +65,7 @@ pub trait FromHex {
 #[derive(Copy)]
 pub enum FromHexError {
     /// The input contained a character not part of the hex format
-    InvalidHexCharacter(char, uint),
+    InvalidHexCharacter(char, usize),
     /// The input had an invalid length
     InvalidHexLength,
 }
@@ -106,7 +106,7 @@ impl FromHex for str {
     /// This converts a string literal to hexadecimal and back.
     ///
     /// ```rust
-    /// # #![allow(staged_unstable)]
+    /// # #![allow(unstable)]
     /// extern crate "rustc-serialize" as rustc_serialize;
     /// use rustc_serialize::hex::{FromHex, ToHex};
     ///
@@ -122,8 +122,8 @@ impl FromHex for str {
     fn from_hex(&self) -> Result<Vec<u8>, FromHexError> {
         // This may be an overestimate if there is any whitespace
         let mut b = Vec::with_capacity(self.len() / 2);
-        let mut modulus = 0i;
-        let mut buf = 0u8;
+        let mut modulus = 0;
+        let mut buf = 08;
 
         for (idx, byte) in self.bytes().enumerate() {
             buf <<= 4;
@@ -191,20 +191,18 @@ mod tests {
 
     #[test]
     pub fn test_to_hex_all_bytes() {
-        for i in range(0u, 256) {
-            assert_eq!([i as u8].to_hex(), format!("{:02x}", i as uint));
+        for i in range(0, 256) {
+            assert_eq!([i as u8].to_hex(), format!("{:02x}", i));
         }
     }
 
     #[test]
     pub fn test_from_hex_all_bytes() {
-        for i in range(0u, 256) {
+        for i in range(0, 256) {
             let ii: &[u8] = &[i as u8];
-            assert_eq!(format!("{:02x}", i as uint).from_hex()
-                                                   .unwrap(),
+            assert_eq!(format!("{:02x}", i).from_hex().unwrap(),
                        ii);
-            assert_eq!(format!("{:02X}", i as uint).from_hex()
-                                                   .unwrap(),
+            assert_eq!(format!("{:02X}", i).from_hex().unwrap(),
                        ii);
         }
     }
