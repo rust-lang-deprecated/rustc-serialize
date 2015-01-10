@@ -202,14 +202,15 @@ use self::DecoderError::*;
 use self::ParserState::*;
 use self::InternalStackElement::*;
 
-use std;
 use std::collections::{HashMap, BTreeMap};
-use std::{char, f64, fmt, io, num, str};
+use std::error::Error as StdError;
 use std::mem::{swap, transmute};
 use std::num::{Float, Int};
+use std::ops::Index;
 use std::str::{FromStr};
 use std::string;
-use std::ops::Index;
+use std::{char, f64, fmt, io, num, str};
+use std;
 use unicode::str as unicode_str;
 use unicode::str::Utf16Item;
 
@@ -331,8 +332,19 @@ fn io_error_to_error(io: io::IoError) -> ParserError {
     IoError(io.kind, io.desc)
 }
 
-impl std::error::Error for DecoderError {
+impl StdError for DecoderError {
     fn description(&self) -> &str { "decoder error" }
+    fn detail(&self) -> Option<std::string::String> { Some(format!("{:?}", self)) }
+    fn cause(&self) -> Option<&StdError> {
+        match *self {
+            DecoderError::ParseError(ref e) => Some(e as &StdError),
+            _ => None,
+        }
+    }
+}
+
+impl StdError for ParserError {
+    fn description(&self) -> &str { "failed to parse json" }
     fn detail(&self) -> Option<std::string::String> { Some(format!("{:?}", self)) }
 }
 
