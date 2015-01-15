@@ -19,22 +19,26 @@
 //! # What is JSON?
 //!
 //! JSON (JavaScript Object Notation) is a way to write data in Javascript.
-//! Like XML, it allows to encode structured data in a text format that can be easily read by humans
-//! Its simple syntax and native compatibility with JavaScript have made it a widely used format.
+//! Like XML, it allows to encode structured data in a text format that can be
+//! easily read by humans Its simple syntax and native compatibility with
+//! JavaScript have made it a widely used format.
 //!
-//! Data types that can be encoded are JavaScript types (see the `Json` enum for more details):
+//! Data types that can be encoded are JavaScript types (see the `Json` enum
+//! for more details):
 //!
 //! * `Boolean`: equivalent to rust's `bool`
 //! * `Number`: equivalent to rust's `f64`
 //! * `String`: equivalent to rust's `String`
-//! * `Array`: equivalent to rust's `Vec<T>`, but also allowing objects of different types in the
+//! * `Array`: equivalent to rust's `Vec<T>`, but also allowing objects of
+//!   different types in the
 //!   same array
-//! * `Object`: equivalent to rust's `Treemap<String, json::Json>`
+//! * `Object`: equivalent to rust's `BTreeMap<String, json::Json>`
 //! * `Null`
 //!
-//! An object is a series of string keys mapping to values, in `"key": value` format.
-//! Arrays are enclosed in square brackets ([ ... ]) and objects in curly brackets ({ ... }).
-//! A simple JSON document encoding a person, his/her age, address and phone numbers could look like
+//! An object is a series of string keys mapping to values, in `"key": value`
+//! format.  Arrays are enclosed in square brackets ([ ... ]) and objects in
+//! curly brackets ({ ... }).  A simple JSON document encoding a person,
+//! his/her age, address and phone numbers could look like
 //!
 //! ```ignore
 //! {
@@ -84,7 +88,8 @@
 //! extern crate "rustc-serialize" as rustc_serialize;
 //! use rustc_serialize::json;
 //!
-//! // Automatically generate `RustcDecodable` and `RustcEncodable` trait implementations
+//! // Automatically generate `RustcDecodable` and `RustcEncodable` trait
+//! // implementations
 //! #[derive(RustcDecodable, RustcEncodable)]
 //! pub struct TestStruct  {
 //!     data_int: u8,
