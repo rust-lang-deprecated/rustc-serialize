@@ -10,5 +10,6 @@ homepage = "https://github.com/rust-lang/rustc-serialize"
 documentation = "http://doc.rust-lang.org/rustc-serialize"
 description = """
 Generic serialization/deserialization support corresponding to the
-`derive(RustcEncodable, RustcDecodable)` mode in the compiler.
+`derive(RustcEncodable, RustcDecodable)` mode in the compiler. Also includes
+support for hex, base64, and json encoding and decoding.
 """
