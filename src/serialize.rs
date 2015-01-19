@@ -98,7 +98,7 @@ pub trait Encoder {
     fn emit_map<F>(&mut self, len: usize, f: F) -> Result<(), Self::Error>
         where F: FnOnce(&mut Self) -> Result<(), Self::Error>;
     fn emit_map_elt_key<F>(&mut self, idx: usize, f: F) -> Result<(), Self::Error>
-        where F: FnMut(&mut Self) -> Result<(), Self::Error>;
+        where F: FnOnce(&mut Self) -> Result<(), Self::Error>;
     fn emit_map_elt_val<F>(&mut self, idx: usize, f: F) -> Result<(), Self::Error>
         where F: FnOnce(&mut Self) -> Result<(), Self::Error>;
 }
@@ -326,7 +326,7 @@ impl Encodable for str {
 
 impl Encodable for String {
     fn encode<S: Encoder>(&self, s: &mut S) -> Result<(), S::Error> {
-        s.emit_str(self.as_slice())
+        s.emit_str(&self[])
     }
 }
 

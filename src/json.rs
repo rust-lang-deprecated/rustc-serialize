@@ -209,10 +209,10 @@ use self::InternalStackElement::*;
 
 use std::collections::{HashMap, BTreeMap};
 use std::error::Error as StdError;
-use std::mem::{swap, transmute};
+use std::mem::swap;
 use std::num::{Float, Int};
 use std::ops::Index;
-use std::str::{FromStr};
+use std::str::FromStr;
 use std::string;
 use std::{char, f64, fmt, io, num, str};
 use std;
@@ -281,6 +281,12 @@ pub enum DecoderError {
     MissingFieldError(string::String),
     UnknownVariantError(string::String),
     ApplicationError(string::String)
+}
+
+#[derive(Copy, Show)]
+pub enum EncoderError {
+    FmtError(fmt::Error),
+    BadHashmapKey,
 }
 
 /// Returns a readable error string for a given error code.
@@ -353,10 +359,19 @@ impl StdError for ParserError {
     fn detail(&self) -> Option<std::string::String> { Some(format!("{:?}", self)) }
 }
 
-pub type EncodeResult = Result<(), fmt::Error>;
+impl StdError for EncoderError {
+    fn description(&self) -> &str { "encoder error" }
+    fn detail(&self) -> Option<std::string::String> { Some(format!("{:?}", self)) }
+}
+
+impl std::error::FromError<fmt::Error> for EncoderError {
+    fn from_error(err: fmt::Error) -> EncoderError { EncoderError::FmtError(err) }
+}
+
+pub type EncodeResult = Result<(), EncoderError>;
 pub type DecodeResult<T> = Result<T, DecoderError>;
 
-fn escape_str(wr: &mut fmt::Writer, v: &str) -> fmt::Result {
+fn escape_str(wr: &mut fmt::Writer, v: &str) -> EncodeResult {
     try!(wr.write_str("\""));
 
     let mut start = 0;
@@ -414,17 +429,18 @@ fn escape_str(wr: &mut fmt::Writer, v: &str) -> fmt::Result {
         try!(wr.write_str(&v[start..]));
     }
 
-    wr.write_str("\"")
+    try!(wr.write_str("\""));
+    Ok(())
 }
 
-fn escape_char(writer: &mut fmt::Writer, v: char) -> fmt::Result {
+fn escape_char(writer: &mut fmt::Writer, v: char) -> EncodeResult {
     let mut buf = [0; 4];
     let n = v.encode_utf8(&mut buf).unwrap();
-    let buf = unsafe { str::from_utf8_unchecked(&buf[0..n]) };
+    let buf = unsafe { str::from_utf8_unchecked(&buf[..n]) };
     escape_str(writer, buf)
 }
 
-fn spaces(wr: &mut fmt::Writer, n: u32) -> fmt::Result {
+fn spaces(wr: &mut fmt::Writer, n: u32) -> EncodeResult {
     let mut n = n as usize;
     const BUF: &'static str = "                ";
 
@@ -434,10 +450,9 @@ fn spaces(wr: &mut fmt::Writer, n: u32) -> fmt::Result {
     }
 
     if n > 0 {
-        wr.write_str(&BUF[..n])
-    } else {
-        Ok(())
+        try!(wr.write_str(&BUF[..n]));
     }
+    Ok(())
 }
 
 fn fmt_number_or_null(v: f64) -> string::String {
@@ -453,42 +468,61 @@ fn fmt_number_or_null(v: f64) -> string::String {
 /// A structure for implementing serialization to JSON.
 pub struct Encoder<'a> {
     writer: &'a mut (fmt::Writer+'a),
+    is_emitting_map_key: bool,
 }
 
 impl<'a> Encoder<'a> {
     /// Creates a new JSON encoder whose output will be written to the writer
     /// specified.
     pub fn new(writer: &'a mut fmt::Writer) -> Encoder<'a> {
-        Encoder { writer: writer }
+        Encoder { writer: writer, is_emitting_map_key: false, }
+    }
+}
+
+macro_rules! emit_enquoted_if_mapkey {
+    ($enc:ident,$e:expr) => {
+        if $enc.is_emitting_map_key {
+            try!(write!($enc.writer, "\"{}\"", $e));
+            Ok(())
+        } else {
+            try!(write!($enc.writer, "{}", $e));
+            Ok(())
+        }
     }
 }
 
 impl<'a> ::Encoder for Encoder<'a> {
-    type Error = fmt::Error;
-    fn emit_nil(&mut self) -> EncodeResult { write!(self.writer, "null") }
+    type Error = EncoderError;
+    fn emit_nil(&mut self) -> EncodeResult {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
+        try!(write!(self.writer, "null"));
+        Ok(())
+    }
 
-    fn emit_usize(&mut self, v: usize) -> EncodeResult { write!(self.writer, "{}", v) }
-    fn emit_u64(&mut self, v: u64) -> EncodeResult { write!(self.writer, "{}", v) }
-    fn emit_u32(&mut self, v: u32) -> EncodeResult { write!(self.writer, "{}", v) }
-    fn emit_u16(&mut self, v: u16) -> EncodeResult { write!(self.writer, "{}", v) }
-    fn emit_u8(&mut self, v: u8) -> EncodeResult { write!(self.writer, "{}", v) }
+    fn emit_usize(&mut self, v: usize) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_u64(&mut self, v: u64) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_u32(&mut self, v: u32) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_u16(&mut self, v: u16) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_u8(&mut self, v: u8) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
 
-    fn emit_isize(&mut self, v: isize) -> EncodeResult { write!(self.writer, "{}", v) }
-    fn emit_i64(&mut self, v: i64) -> EncodeResult { write!(self.writer, "{}", v) }
-    fn emit_i32(&mut self, v: i32) -> EncodeResult { write!(self.writer, "{}", v) }
-    fn emit_i16(&mut self, v: i16) -> EncodeResult { write!(self.writer, "{}", v) }
-    fn emit_i8(&mut self, v: i8) -> EncodeResult { write!(self.writer, "{}", v) }
+    fn emit_isize(&mut self, v: isize) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_i64(&mut self, v: i64) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_i32(&mut self, v: i32) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_i16(&mut self, v: i16) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_i8(&mut self, v: i8) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
 
     fn emit_bool(&mut self, v: bool) -> EncodeResult {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if v {
-            write!(self.writer, "true")
+            try!(write!(self.writer, "true"));
         } else {
-            write!(self.writer, "false")
+            try!(write!(self.writer, "false"));
         }
+        Ok(())
     }
 
     fn emit_f64(&mut self, v: f64) -> EncodeResult {
-        write!(self.writer, "{}", fmt_number_or_null(v))
+        emit_enquoted_if_mapkey!(self, fmt_number_or_null(v))
     }
     fn emit_f32(&mut self, v: f32) -> EncodeResult {
         self.emit_f64(v as f64)
@@ -504,6 +538,7 @@ impl<'a> ::Encoder for Encoder<'a> {
     fn emit_enum<F>(&mut self, _name: &str, f: F) -> EncodeResult where
         F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         f(self)
     }
 
@@ -517,6 +552,7 @@ impl<'a> ::Encoder for Encoder<'a> {
         // enums are encoded as strings or objects
         // Bunny => "Bunny"
         // Kangaroo(34,"William") => {"variant": "Kangaroo", "fields": [34,"William"]}
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if cnt == 0 {
             escape_str(self.writer, name)
         } else {
@@ -524,13 +560,15 @@ impl<'a> ::Encoder for Encoder<'a> {
             try!(escape_str(self.writer, name));
             try!(write!(self.writer, ",\"fields\":["));
             try!(f(self));
-            write!(self.writer, "]}}")
+            try!(write!(self.writer, "]}}"));
+            Ok(())
         }
     }
 
     fn emit_enum_variant_arg<F>(&mut self, idx: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if idx != 0 {
             try!(write!(self.writer, ","));
         }
@@ -544,6 +582,7 @@ impl<'a> ::Encoder for Encoder<'a> {
                                    f: F) -> EncodeResult where
         F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         self.emit_enum_variant(name, id, cnt, f)
     }
 
@@ -553,20 +592,24 @@ impl<'a> ::Encoder for Encoder<'a> {
                                          f: F) -> EncodeResult where
         F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         self.emit_enum_variant_arg(idx, f)
     }
 
     fn emit_struct<F>(&mut self, _: &str, _: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         try!(write!(self.writer, "{{"));
         try!(f(self));
-        write!(self.writer, "}}")
+        try!(write!(self.writer, "}}"));
+        Ok(())
     }
 
     fn emit_struct_field<F>(&mut self, name: &str, idx: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if idx != 0 { try!(write!(self.writer, ",")); }
         try!(escape_str(self.writer, name));
         try!(write!(self.writer, ":"));
@@ -576,48 +619,60 @@ impl<'a> ::Encoder for Encoder<'a> {
     fn emit_tuple<F>(&mut self, len: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         self.emit_seq(len, f)
     }
     fn emit_tuple_arg<F>(&mut self, idx: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         self.emit_seq_elt(idx, f)
     }
 
     fn emit_tuple_struct<F>(&mut self, _name: &str, len: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         self.emit_seq(len, f)
     }
     fn emit_tuple_struct_arg<F>(&mut self, idx: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         self.emit_seq_elt(idx, f)
     }
 
     fn emit_option<F>(&mut self, f: F) -> EncodeResult where
         F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         f(self)
     }
-    fn emit_option_none(&mut self) -> EncodeResult { self.emit_nil() }
+    fn emit_option_none(&mut self) -> EncodeResult {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
+        self.emit_nil()
+    }
     fn emit_option_some<F>(&mut self, f: F) -> EncodeResult where
         F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         f(self)
     }
 
     fn emit_seq<F>(&mut self, _len: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         try!(write!(self.writer, "["));
         try!(f(self));
-        write!(self.writer, "]")
+        try!(write!(self.writer, "]"));
+        Ok(())
     }
 
     fn emit_seq_elt<F>(&mut self, idx: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if idx != 0 {
             try!(write!(self.writer, ","));
         }
@@ -627,34 +682,28 @@ impl<'a> ::Encoder for Encoder<'a> {
     fn emit_map<F>(&mut self, _len: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         try!(write!(self.writer, "{{"));
         try!(f(self));
-        write!(self.writer, "}}")
+        try!(write!(self.writer, "}}"));
+        Ok(())
     }
 
-    fn emit_map_elt_key<F>(&mut self, idx: usize, mut f: F) -> EncodeResult where
-        F: FnMut(&mut Encoder<'a>) -> EncodeResult,
+    fn emit_map_elt_key<F>(&mut self, idx: usize, f: F) -> EncodeResult where
+        F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if idx != 0 { try!(write!(self.writer, ",")) }
-        // ref #12967, make sure to wrap a key in double quotes,
-        // in the event that its of a type that omits them (eg numbers)
-        let mut buf = Vec::new();
-        // FIXME(14302) remove the transmute and unsafe block.
-        unsafe {
-            let mut check_encoder = Encoder::new(&mut buf);
-            try!(f(transmute(&mut check_encoder)));
-        }
-        let out = str::from_utf8(&buf[]).unwrap();
-        let needs_wrapping = out.char_at(0) != '"' && out.char_at_reverse(out.len()) != '"';
-        if needs_wrapping { try!(write!(self.writer, "\"")); }
+        self.is_emitting_map_key = true;
         try!(f(self));
-        if needs_wrapping { try!(write!(self.writer, "\"")); }
+        self.is_emitting_map_key = false;
         Ok(())
     }
 
     fn emit_map_elt_val<F>(&mut self, _idx: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         try!(write!(self.writer, ":"));
         f(self)
     }
@@ -666,12 +715,18 @@ pub struct PrettyEncoder<'a> {
     writer: &'a mut (fmt::Writer+'a),
     curr_indent: u32,
     indent: u32,
+    is_emitting_map_key: bool,
 }
 
 impl<'a> PrettyEncoder<'a> {
     /// Creates a new encoder whose output will be written to the specified writer
     pub fn new(writer: &'a mut fmt::Writer) -> PrettyEncoder<'a> {
-        PrettyEncoder { writer: writer, curr_indent: 0, indent: 2, }
+        PrettyEncoder {
+            writer: writer,
+            curr_indent: 0,
+            indent: 2,
+            is_emitting_map_key: false,
+        }
     }
 
     /// Set the number of spaces to indent for each level.
@@ -685,32 +740,38 @@ impl<'a> PrettyEncoder<'a> {
 }
 
 impl<'a> ::Encoder for PrettyEncoder<'a> {
-    type Error = fmt::Error;
+    type Error = EncoderError;
 
-    fn emit_nil(&mut self) -> EncodeResult { write!(self.writer, "null") }
+    fn emit_nil(&mut self) -> EncodeResult {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
+        try!(write!(self.writer, "null"));
+        Ok(())
+    }
 
-    fn emit_usize(&mut self, v: usize) -> EncodeResult { write!(self.writer, "{}", v) }
-    fn emit_u64(&mut self, v: u64) -> EncodeResult { write!(self.writer, "{}", v) }
-    fn emit_u32(&mut self, v: u32) -> EncodeResult { write!(self.writer, "{}", v) }
-    fn emit_u16(&mut self, v: u16) -> EncodeResult { write!(self.writer, "{}", v) }
-    fn emit_u8(&mut self, v: u8) -> EncodeResult { write!(self.writer, "{}", v) }
+    fn emit_usize(&mut self, v: usize) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_u64(&mut self, v: u64) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_u32(&mut self, v: u32) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_u16(&mut self, v: u16) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_u8(&mut self, v: u8) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
 
-    fn emit_isize(&mut self, v: isize) -> EncodeResult { write!(self.writer, "{}", v) }
-    fn emit_i64(&mut self, v: i64) -> EncodeResult { write!(self.writer, "{}", v) }
-    fn emit_i32(&mut self, v: i32) -> EncodeResult { write!(self.writer, "{}", v) }
-    fn emit_i16(&mut self, v: i16) -> EncodeResult { write!(self.writer, "{}", v) }
-    fn emit_i8(&mut self, v: i8) -> EncodeResult { write!(self.writer, "{}", v) }
+    fn emit_isize(&mut self, v: isize) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_i64(&mut self, v: i64) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_i32(&mut self, v: i32) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_i16(&mut self, v: i16) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_i8(&mut self, v: i8) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
 
     fn emit_bool(&mut self, v: bool) -> EncodeResult {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if v {
-            write!(self.writer, "true")
+            try!(write!(self.writer, "true"));
         } else {
-            write!(self.writer, "false")
+            try!(write!(self.writer, "false"));
         }
+        Ok(())
     }
 
     fn emit_f64(&mut self, v: f64) -> EncodeResult {
-        write!(self.writer, "{}", fmt_number_or_null(v))
+        emit_enquoted_if_mapkey!(self, fmt_number_or_null(v))
     }
     fn emit_f32(&mut self, v: f32) -> EncodeResult {
         self.emit_f64(v as f64)
@@ -726,6 +787,7 @@ impl<'a> ::Encoder for PrettyEncoder<'a> {
     fn emit_enum<F>(&mut self, _name: &str, f: F) -> EncodeResult where
         F: FnOnce(&mut PrettyEncoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         f(self)
     }
 
@@ -737,6 +799,7 @@ impl<'a> ::Encoder for PrettyEncoder<'a> {
                             -> EncodeResult where
         F: FnOnce(&mut PrettyEncoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if cnt == 0 {
             escape_str(self.writer, name)
         } else {
@@ -756,13 +819,15 @@ impl<'a> ::Encoder for PrettyEncoder<'a> {
             self.curr_indent -= self.indent;
             try!(write!(self.writer, "]\n"));
             try!(spaces(self.writer, self.curr_indent));
-            write!(self.writer, "}}")
+            try!(write!(self.writer, "}}"));
+            Ok(())
         }
     }
 
     fn emit_enum_variant_arg<F>(&mut self, idx: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut PrettyEncoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if idx != 0 {
             try!(write!(self.writer, ",\n"));
         }
@@ -777,6 +842,7 @@ impl<'a> ::Encoder for PrettyEncoder<'a> {
                                    f: F) -> EncodeResult where
         F: FnOnce(&mut PrettyEncoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         self.emit_enum_variant(name, id, cnt, f)
     }
 
@@ -786,6 +852,7 @@ impl<'a> ::Encoder for PrettyEncoder<'a> {
                                          f: F) -> EncodeResult where
         F: FnOnce(&mut PrettyEncoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         self.emit_enum_variant_arg(idx, f)
     }
 
@@ -793,8 +860,9 @@ impl<'a> ::Encoder for PrettyEncoder<'a> {
     fn emit_struct<F>(&mut self, _: &str, len: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut PrettyEncoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if len == 0 {
-            write!(self.writer, "{{}}")
+            try!(write!(self.writer, "{{}}"));
         } else {
             try!(write!(self.writer, "{{"));
             self.curr_indent += self.indent;
@@ -802,13 +870,15 @@ impl<'a> ::Encoder for PrettyEncoder<'a> {
             self.curr_indent -= self.indent;
             try!(write!(self.writer, "\n"));
             try!(spaces(self.writer, self.curr_indent));
-            write!(self.writer, "}}")
+            try!(write!(self.writer, "}}"));
         }
+        Ok(())
     }
 
     fn emit_struct_field<F>(&mut self, name: &str, idx: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut PrettyEncoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if idx == 0 {
             try!(write!(self.writer, "\n"));
         } else {
@@ -823,42 +893,52 @@ impl<'a> ::Encoder for PrettyEncoder<'a> {
     fn emit_tuple<F>(&mut self, len: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut PrettyEncoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         self.emit_seq(len, f)
     }
     fn emit_tuple_arg<F>(&mut self, idx: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut PrettyEncoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         self.emit_seq_elt(idx, f)
     }
 
     fn emit_tuple_struct<F>(&mut self, _: &str, len: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut PrettyEncoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         self.emit_seq(len, f)
     }
     fn emit_tuple_struct_arg<F>(&mut self, idx: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut PrettyEncoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         self.emit_seq_elt(idx, f)
     }
 
     fn emit_option<F>(&mut self, f: F) -> EncodeResult where
         F: FnOnce(&mut PrettyEncoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         f(self)
     }
-    fn emit_option_none(&mut self) -> EncodeResult { self.emit_nil() }
+    fn emit_option_none(&mut self) -> EncodeResult {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
+        self.emit_nil()
+    }
     fn emit_option_some<F>(&mut self, f: F) -> EncodeResult where
         F: FnOnce(&mut PrettyEncoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         f(self)
     }
 
     fn emit_seq<F>(&mut self, len: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut PrettyEncoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if len == 0 {
-            write!(self.writer, "[]")
+            try!(write!(self.writer, "[]"));
         } else {
             try!(write!(self.writer, "["));
             self.curr_indent += self.indent;
@@ -866,13 +946,15 @@ impl<'a> ::Encoder for PrettyEncoder<'a> {
             self.curr_indent -= self.indent;
             try!(write!(self.writer, "\n"));
             try!(spaces(self.writer, self.curr_indent));
-            write!(self.writer, "]")
+            try!(write!(self.writer, "]"));
         }
+        Ok(())
     }
 
     fn emit_seq_elt<F>(&mut self, idx: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut PrettyEncoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if idx == 0 {
             try!(write!(self.writer, "\n"));
         } else {
@@ -885,8 +967,9 @@ impl<'a> ::Encoder for PrettyEncoder<'a> {
     fn emit_map<F>(&mut self, len: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut PrettyEncoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if len == 0 {
-            write!(self.writer, "{{}}")
+            try!(write!(self.writer, "{{}}"));
         } else {
             try!(write!(self.writer, "{{"));
             self.curr_indent += self.indent;
@@ -894,38 +977,31 @@ impl<'a> ::Encoder for PrettyEncoder<'a> {
             self.curr_indent -= self.indent;
             try!(write!(self.writer, "\n"));
             try!(spaces(self.writer, self.curr_indent));
-            write!(self.writer, "}}")
+            try!(write!(self.writer, "}}"));
         }
+        Ok(())
     }
 
-    fn emit_map_elt_key<F>(&mut self, idx: usize, mut f: F) -> EncodeResult where
-        F: FnMut(&mut PrettyEncoder<'a>) -> EncodeResult,
+    fn emit_map_elt_key<F>(&mut self, idx: usize, f: F) -> EncodeResult where
+        F: FnOnce(&mut PrettyEncoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if idx == 0 {
             try!(write!(self.writer, "\n"));
         } else {
             try!(write!(self.writer, ",\n"));
         }
         try!(spaces(self.writer, self.curr_indent));
-        // ref #12967, make sure to wrap a key in double quotes,
-        // in the event that its of a type that omits them (eg numbers)
-        let mut buf = Vec::new();
-        // FIXME(14302) remove the transmute and unsafe block.
-        unsafe {
-            let mut check_encoder = PrettyEncoder::new(&mut buf);
-            try!(f(transmute(&mut check_encoder)));
-        }
-        let out = str::from_utf8(&buf[]).unwrap();
-        let needs_wrapping = out.char_at(0) != '"' && out.char_at_reverse(out.len()) != '"';
-        if needs_wrapping { try!(write!(self.writer, "\"")); }
+        self.is_emitting_map_key = true;
         try!(f(self));
-        if needs_wrapping { try!(write!(self.writer, "\"")); }
+        self.is_emitting_map_key = false;
         Ok(())
     }
 
     fn emit_map_elt_val<F>(&mut self, _idx: usize, f: F) -> EncodeResult where
         F: FnOnce(&mut PrettyEncoder<'a>) -> EncodeResult,
     {
+        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         try!(write!(self.writer, ": "));
         f(self)
     }
@@ -1178,7 +1254,7 @@ impl Index<usize> for Json {
 
     fn index<'a>(&'a self, idx: &usize) -> &'a Json {
         match self {
-            &Json::Array(ref v) => v.index(idx),
+            &Json::Array(ref v) => &v[*idx],
             _ => panic!("can only index Json with usize if it is an array")
         }
     }
@@ -2457,7 +2533,10 @@ struct FormatShim<'a, 'b: 'a> {
 
 impl<'a, 'b> fmt::Writer for FormatShim<'a, 'b> {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.inner.write_str(s)
+        match self.inner.write_str(s) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(fmt::Error)
+        }
     }
 }
 
@@ -2466,7 +2545,10 @@ impl fmt::String for Json {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut shim = FormatShim { inner: f };
         let mut encoder = Encoder::new(&mut shim);
-        self.encode(&mut encoder)
+        match self.encode(&mut encoder) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(fmt::Error)
+        }
     }
 }
 
@@ -2475,7 +2557,10 @@ impl<'a> fmt::String for PrettyJson<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut shim = FormatShim { inner: f };
         let mut encoder = PrettyEncoder::new(&mut shim);
-        self.inner.encode(&mut encoder)
+        match self.inner.encode(&mut encoder) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(fmt::Error)
+        }
     }
 }
 
@@ -2484,7 +2569,10 @@ impl<'a, T: Encodable> fmt::String for AsJson<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut shim = FormatShim { inner: f };
         let mut encoder = Encoder::new(&mut shim);
-        self.inner.encode(&mut encoder)
+        match self.inner.encode(&mut encoder) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(fmt::Error)
+        }
     }
 }
 
@@ -2505,7 +2593,10 @@ impl<'a, T: Encodable> fmt::String for AsPrettyJson<'a, T> {
             Some(n) => encoder.set_indent(n),
             None => {}
         }
-        self.inner.encode(&mut encoder)
+        match self.inner.encode(&mut encoder) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(fmt::Error)
+        }
     }
 }
 
@@ -2529,7 +2620,7 @@ mod tests {
     use super::JsonEvent::*;
     use super::StackElement::*;
     use super::{Json, DecodeResult, DecoderError, JsonEvent, Parser,
-                StackElement, Stack, Decoder};
+                StackElement, Stack, Decoder, Encoder, EncoderError};
     use std::{i64, u64, f32, f64};
     use std::collections::BTreeMap;
     use std::num::Float;
@@ -3815,6 +3906,24 @@ mod tests {
         assert_eq!(Some(15is).to_json(), I64(15));
         assert_eq!(Some(15us).to_json(), U64(15));
         assert_eq!(None::<isize>.to_json(), Null);
+    }
+
+    #[test]
+    fn test_encode_hashmap_with_arbitrary_key() {
+        use std::io::Writer;
+        use std::collections::HashMap;
+        use std::fmt;
+        #[derive(PartialEq, Eq, Hash, RustcEncodable)]
+        struct ArbitraryType(u32);
+        let mut hm: HashMap<ArbitraryType, bool> = HashMap::new();
+        hm.insert(ArbitraryType(1), true);
+        let mut mem_buf = Vec::new();
+        let mut encoder = Encoder::new(&mut mem_buf as &mut fmt::Writer);
+        let result = hm.encode(&mut encoder);
+        match result.unwrap_err() {
+            EncoderError::BadHashmapKey => (),
+            _ => panic!("expected bad hash map key")
+        }
     }
 
     #[bench]
