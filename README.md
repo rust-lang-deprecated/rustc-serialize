@@ -1,7 +1,7 @@
 # rustc-serialize
 
 Serialization and deserialization support provided by the compiler in the form
-of `deriving(RustcEncodable, RustcDecodable)`.
+of `derive(RustcEncodable, RustcDecodable)`.
 
 [![Build Status](https://travis-ci.org/rust-lang/rustc-serialize.svg?branch=master)](https://travis-ci.org/rust-lang/rustc-serialize)
 
