@@ -333,7 +333,7 @@ pub fn encode<T: ::Encodable>(object: &T) -> Result<string::String, EncoderError
     Ok(s)
 }
 
-impl fmt::Show for ErrorCode {
+impl fmt::Debug for ErrorCode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         error_str(*self).fmt(f)
     }
@@ -345,7 +345,6 @@ fn io_error_to_error(io: io::IoError) -> ParserError {
 
 impl StdError for DecoderError {
     fn description(&self) -> &str { "decoder error" }
-    fn detail(&self) -> Option<std::string::String> { Some(format!("{:?}", self)) }
     fn cause(&self) -> Option<&StdError> {
         match *self {
             DecoderError::ParseError(ref e) => Some(e as &StdError),
@@ -354,14 +353,30 @@ impl StdError for DecoderError {
     }
 }
 
+impl fmt::Display for DecoderError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		fmt::Debug::fmt(&self, f)
+	}
+}
+
 impl StdError for ParserError {
     fn description(&self) -> &str { "failed to parse json" }
-    fn detail(&self) -> Option<std::string::String> { Some(format!("{:?}", self)) }
+}
+
+impl fmt::Display for ParserError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		fmt::Debug::fmt(&self, f)
+	}
 }
 
 impl StdError for EncoderError {
     fn description(&self) -> &str { "encoder error" }
-    fn detail(&self) -> Option<std::string::String> { Some(format!("{:?}", self)) }
+}
+
+impl fmt::Display for EncoderError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		fmt::Debug::fmt(&self, f)
+	}
 }
 
 impl std::error::FromError<fmt::Error> for EncoderError {

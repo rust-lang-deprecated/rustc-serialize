@@ -186,7 +186,7 @@ pub enum FromBase64Error {
     InvalidBase64Length,
 }
 
-impl fmt::Show for FromBase64Error {
+impl fmt::Debug for FromBase64Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             InvalidBase64Byte(ch, idx) =>
@@ -203,9 +203,11 @@ impl error::Error for FromBase64Error {
             InvalidBase64Length => "invalid length",
         }
     }
+}
 
-    fn detail(&self) -> Option<String> {
-        Some(format!("{:?}", self))
+impl fmt::Display for FromBase64Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(&self, f)
     }
 }
 

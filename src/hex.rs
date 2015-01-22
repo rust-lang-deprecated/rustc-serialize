@@ -70,7 +70,7 @@ pub enum FromHexError {
     InvalidHexLength,
 }
 
-impl fmt::Show for FromHexError {
+impl fmt::Debug for FromHexError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             InvalidHexCharacter(ch, idx) =>
@@ -87,12 +87,13 @@ impl error::Error for FromHexError {
             InvalidHexLength => "invalid length",
         }
     }
-
-    fn detail(&self) -> Option<String> {
-        Some(format!("{:?}", self))
-    }
 }
 
+impl fmt::Display for FromHexError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(&self, f)
+    }
+}
 
 impl FromHex for str {
     /// Convert any hexadecimal encoded string (literal, `@`, `&`, or `~`)
