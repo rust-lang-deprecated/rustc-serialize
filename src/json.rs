@@ -538,7 +538,6 @@ impl<'a> ::Encoder for Encoder<'a> {
     fn emit_enum<F>(&mut self, _name: &str, f: F) -> EncodeResult where
         F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
     {
-        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         f(self)
     }
 
@@ -552,10 +551,10 @@ impl<'a> ::Encoder for Encoder<'a> {
         // enums are encoded as strings or objects
         // Bunny => "Bunny"
         // Kangaroo(34,"William") => {"variant": "Kangaroo", "fields": [34,"William"]}
-        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if cnt == 0 {
             escape_str(self.writer, name)
         } else {
+            if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
             try!(write!(self.writer, "{{\"variant\":"));
             try!(escape_str(self.writer, name));
             try!(write!(self.writer, ",\"fields\":["));
@@ -787,7 +786,6 @@ impl<'a> ::Encoder for PrettyEncoder<'a> {
     fn emit_enum<F>(&mut self, _name: &str, f: F) -> EncodeResult where
         F: FnOnce(&mut PrettyEncoder<'a>) -> EncodeResult,
     {
-        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         f(self)
     }
 
@@ -799,10 +797,10 @@ impl<'a> ::Encoder for PrettyEncoder<'a> {
                             -> EncodeResult where
         F: FnOnce(&mut PrettyEncoder<'a>) -> EncodeResult,
     {
-        if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if cnt == 0 {
             escape_str(self.writer, name)
         } else {
+            if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
             try!(write!(self.writer, "{{\n"));
             self.curr_indent += self.indent;
             try!(spaces(self.writer, self.curr_indent));
@@ -3556,7 +3554,7 @@ mod tests {
     fn test_hashmap_with_enum_key() {
         use std::collections::HashMap;
         use json;
-        #[derive(RustcEncodable, Eq, Hash, PartialEq)]
+        #[derive(RustcEncodable, Eq, Hash, PartialEq, RustcDecodable, Show)]
         enum Enum {
             Foo,
             #[allow(dead_code)]
@@ -3564,12 +3562,10 @@ mod tests {
         }
         let mut map = HashMap::new();
         map.insert(Enum::Foo, 0);
-        let result = json::encode(&map);
-        match result.unwrap_err() {
-            EncoderError::BadHashmapKey => (),
-            _ => panic!("expected bad hash map key")
-        }
-        //assert_eq!(&enc[], r#"{"Foo": 0}"#);
+        let result = json::encode(&map).unwrap();
+        assert_eq!(&result[], r#"{"Foo":0}"#);
+        let decoded: HashMap<Enum, _> = json::decode(result.as_slice()).unwrap();
+        assert_eq!(map, decoded);
     }
 
     #[test]
