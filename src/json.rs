@@ -105,7 +105,7 @@
 //!     };
 //!
 //!     // Serialize using `json::encode`
-//!     let encoded = json::encode(&object);
+//!     let encoded = json::encode(&object).unwrap();
 //!
 //!     // Deserialize using `json::decode`
 //!     let decoded: TestStruct = json::decode(encoded.as_slice()).unwrap();
@@ -151,7 +151,7 @@
 //!         uid: 1,
 //!         dsc: "test".to_string(),
 //!         val: num.to_json(),
-//!     });
+//!     }).unwrap();
 //!     println!("data: {}", data);
 //!     // data: {"uid":1,"dsc":"test","val":"0.0001+12.539j"};
 //! }
@@ -324,13 +324,13 @@ pub fn decode<T: ::Decodable>(s: &str) -> DecodeResult<T> {
 }
 
 /// Shortcut function to encode a `T` into a JSON `String`
-pub fn encode<T: ::Encodable>(object: &T) -> string::String {
+pub fn encode<T: ::Encodable>(object: &T) -> Result<string::String, EncoderError> {
     let mut s = String::new();
     {
         let mut encoder = Encoder::new(&mut s);
-        let _ = object.encode(&mut encoder);
+        try!(object.encode(&mut encoder));
     }
-    s
+    Ok(s)
 }
 
 impl fmt::Show for ErrorCode {
@@ -3550,6 +3550,26 @@ mod tests {
         };
         let mut decoder = Decoder::new(json_obj);
         let _hm: HashMap<usize, bool> = Decodable::decode(&mut decoder).unwrap();
+    }
+
+    #[test]
+    fn test_hashmap_with_enum_key() {
+        use std::collections::HashMap;
+        use json;
+        #[derive(RustcEncodable, Eq, Hash, PartialEq)]
+        enum Enum {
+            Foo,
+            #[allow(dead_code)]
+            Bar,
+        }
+        let mut map = HashMap::new();
+        map.insert(Enum::Foo, 0);
+        let result = json::encode(&map);
+        match result.unwrap_err() {
+            EncoderError::BadHashmapKey => (),
+            _ => panic!("expected bad hash map key")
+        }
+        //assert_eq!(&enc[], r#"{"Foo": 0}"#);
     }
 
     #[test]
