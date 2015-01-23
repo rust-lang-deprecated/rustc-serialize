@@ -354,9 +354,9 @@ impl StdError for DecoderError {
 }
 
 impl fmt::Display for DecoderError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		fmt::Debug::fmt(&self, f)
-	}
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(&self, f)
+    }
 }
 
 impl StdError for ParserError {
@@ -364,9 +364,9 @@ impl StdError for ParserError {
 }
 
 impl fmt::Display for ParserError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		fmt::Debug::fmt(&self, f)
-	}
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(&self, f)
+    }
 }
 
 impl StdError for EncoderError {
@@ -374,9 +374,9 @@ impl StdError for EncoderError {
 }
 
 impl fmt::Display for EncoderError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		fmt::Debug::fmt(&self, f)
-	}
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(&self, f)
+    }
 }
 
 impl std::error::FromError<fmt::Error> for EncoderError {
@@ -2553,7 +2553,7 @@ impl<'a, 'b> fmt::Writer for FormatShim<'a, 'b> {
     }
 }
 
-impl fmt::String for Json {
+impl fmt::Display for Json {
     /// Encodes a json value into a string
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut shim = FormatShim { inner: f };
@@ -2565,7 +2565,7 @@ impl fmt::String for Json {
     }
 }
 
-impl<'a> fmt::String for PrettyJson<'a> {
+impl<'a> fmt::Display for PrettyJson<'a> {
     /// Encodes a json value into a string
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut shim = FormatShim { inner: f };
@@ -2577,7 +2577,7 @@ impl<'a> fmt::String for PrettyJson<'a> {
     }
 }
 
-impl<'a, T: Encodable> fmt::String for AsJson<'a, T> {
+impl<'a, T: Encodable> fmt::Display for AsJson<'a, T> {
     /// Encodes a json value into a string
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut shim = FormatShim { inner: f };
@@ -2597,7 +2597,7 @@ impl<'a, T> AsPrettyJson<'a, T> {
     }
 }
 
-impl<'a, T: Encodable> fmt::String for AsPrettyJson<'a, T> {
+impl<'a, T: Encodable> fmt::Display for AsPrettyJson<'a, T> {
     /// Encodes a json value into a string
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut shim = FormatShim { inner: f };
@@ -3951,7 +3951,7 @@ mod tests {
         let mut mem_buf = Vec::new();
         let mut encoder = Encoder::new(&mut mem_buf as &mut fmt::Writer);
         let result = hm.encode(&mut encoder);
-        match result.unwrap_err() {
+        match result.err().unwrap() {
             EncoderError::BadHashmapKey => (),
             _ => panic!("expected bad hash map key")
         }
