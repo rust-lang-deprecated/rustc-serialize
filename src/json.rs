@@ -199,6 +199,40 @@
 //!     let decoded: TestStruct = json::decode(json_str.as_slice()).unwrap();
 //! }
 //! ```
+//!
+//! ## Parsing a `str` to `Json` and reading the result
+//!
+//! ```rust
+//! # #![allow(unstable)]
+//! extern crate "rustc-serialize" as rustc_serialize;
+//! use rustc_serialize::json::Json;
+//!
+//! fn main() {
+//!     let data = Json::from_str("{\"foo\": 13, \"bar\": \"baz\"}").unwrap();
+//!     println!("data: {}", data);
+//!     // data: {"bar":"baz","foo":13}
+//!     println!("object? {}", data.is_object());
+//!     // object? true
+//!
+//!     let obj = data.as_object().unwrap();
+//!     let foo = obj.get("foo").unwrap();
+//!
+//!     println!("array? {:?}", foo.as_array());
+//!     // array? None
+//!     println!("u64? {:?}", foo.as_u64());
+//!     // u64? Some(13u64)
+//!
+//!     for (key, value) in obj.iter() {
+//!         println!("{}: {}", key, match *value {
+//!             Json::U64(v) => format!("{} (u64)", v),
+//!             Json::String(ref v) => format!("{} (string)", v),
+//!             _ => format!("other")
+//!         });
+//!     }
+//!     // bar: baz (string)
+//!     // foo: 13 (u64)
+//! }
+//! ```
 
 use self::JsonEvent::*;
 use self::ErrorCode::*;
