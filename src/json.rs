@@ -216,23 +216,22 @@
 //!
 //!     let obj = data.as_object().unwrap();
 //!     let foo = obj.get("foo").unwrap();
-//!     println!("array? {}", foo.is_array());
-//!     // array? false
-//!     println!("u64? {}", foo.is_u64());
-//!     // u64? true
-//!     println!("foo: {}", foo.as_u64().unwrap());
-//!     // foo: 13
 //!
-//!     for key in obj.keys() {
-//!         let value = obj.get(key).unwrap();
+//!     println!("array? {:?}", foo.as_array());
+//!     // array? None
+//!     println!("u64? {:?}", foo.as_u64());
+//!     // u64? Some(13u64)
+//!
+//!     for (key, value) in obj.iter() {
 //!         println!("{}: {}", key, match *value {
-//!             Json::U64(v) => format!("u64: {}", v),
-//!             Json::String(ref v) => format!("string: {}", v),
+//!             Json::U64(v) => format!("{} (u64)", v),
+//!             Json::String(ref v) => format!("{} (string)", v),
 //!             _ => format!("other")
 //!         });
 //!     }
 //!     // bar: string: baz
 //!     // foo: u64: 13
+//!
 //! }
 //! ```
 
