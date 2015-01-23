@@ -2472,7 +2472,7 @@ impl<'a, T: Encodable> fmt::Display for AsPrettyJson<'a, T> {
         let mut encoder = Encoder::new_pretty(&mut shim);
         if let Some(n) = self.indent {
             // unwrap cannot panic for pretty encoders
-            encoder.set_indent(n).unwrap();
+            let _ = encoder.set_indent(n);
         }
         match self.inner.encode(&mut encoder) {
             Ok(_) => Ok(()),
