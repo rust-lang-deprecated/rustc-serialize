@@ -229,9 +229,8 @@
 //!             _ => format!("other")
 //!         });
 //!     }
-//!     // bar: string: baz
-//!     // foo: u64: 13
-//!
+//!     // bar: baz (string)
+//!     // foo: 13 (u64)
 //! }
 //! ```
 
