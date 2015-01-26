@@ -358,7 +358,7 @@ pub fn decode<T: ::Decodable>(s: &str) -> DecodeResult<T> {
 }
 
 /// Shortcut function to encode a `T` into a JSON `String`
-pub fn encode<T: ::Encodable>(object: &T) -> Result<string::String, EncoderError> {
+pub fn encode<T: ::Encodable>(object: &T) -> EncodeResult<string::String> {
     let mut s = String::new();
     {
         let mut encoder = Encoder::new(&mut s);
@@ -417,10 +417,10 @@ impl std::error::FromError<fmt::Error> for EncoderError {
     fn from_error(err: fmt::Error) -> EncoderError { EncoderError::FmtError(err) }
 }
 
-pub type EncodeResult = Result<(), EncoderError>;
+pub type EncodeResult<T> = Result<T, EncoderError>;
 pub type DecodeResult<T> = Result<T, DecoderError>;
 
-fn escape_str(wr: &mut fmt::Writer, v: &str) -> EncodeResult {
+fn escape_str(wr: &mut fmt::Writer, v: &str) -> EncodeResult<()> {
     try!(wr.write_str("\""));
 
     let mut start = 0;
@@ -482,14 +482,14 @@ fn escape_str(wr: &mut fmt::Writer, v: &str) -> EncodeResult {
     Ok(())
 }
 
-fn escape_char(writer: &mut fmt::Writer, v: char) -> EncodeResult {
+fn escape_char(writer: &mut fmt::Writer, v: char) -> EncodeResult<()> {
     let mut buf = [0; 4];
     let n = v.encode_utf8(&mut buf).unwrap();
     let buf = unsafe { str::from_utf8_unchecked(&buf[..n]) };
     escape_str(writer, buf)
 }
 
-fn spaces(wr: &mut fmt::Writer, n: u32) -> EncodeResult {
+fn spaces(wr: &mut fmt::Writer, n: u32) -> EncodeResult<()> {
     let mut n = n as usize;
     const BUF: &'static str = "                ";
 
@@ -583,25 +583,25 @@ impl<'a> Encoder<'a> {
 impl<'a> ::Encoder for Encoder<'a> {
     type Error = EncoderError;
 
-    fn emit_nil(&mut self) -> EncodeResult {
+    fn emit_nil(&mut self) -> EncodeResult<()> {
         if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         try!(write!(self.writer, "null"));
         Ok(())
     }
 
-    fn emit_usize(&mut self, v: usize) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
-    fn emit_u64(&mut self, v: u64) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
-    fn emit_u32(&mut self, v: u32) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
-    fn emit_u16(&mut self, v: u16) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
-    fn emit_u8(&mut self, v: u8) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_usize(&mut self, v: usize) -> EncodeResult<()> { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_u64(&mut self, v: u64) -> EncodeResult<()> { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_u32(&mut self, v: u32) -> EncodeResult<()> { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_u16(&mut self, v: u16) -> EncodeResult<()> { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_u8(&mut self, v: u8) -> EncodeResult<()> { emit_enquoted_if_mapkey!(self, v) }
 
-    fn emit_isize(&mut self, v: isize) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
-    fn emit_i64(&mut self, v: i64) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
-    fn emit_i32(&mut self, v: i32) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
-    fn emit_i16(&mut self, v: i16) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
-    fn emit_i8(&mut self, v: i8) -> EncodeResult { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_isize(&mut self, v: isize) -> EncodeResult<()> { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_i64(&mut self, v: i64) -> EncodeResult<()> { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_i32(&mut self, v: i32) -> EncodeResult<()> { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_i16(&mut self, v: i16) -> EncodeResult<()> { emit_enquoted_if_mapkey!(self, v) }
+    fn emit_i8(&mut self, v: i8) -> EncodeResult<()> { emit_enquoted_if_mapkey!(self, v) }
 
-    fn emit_bool(&mut self, v: bool) -> EncodeResult {
+    fn emit_bool(&mut self, v: bool) -> EncodeResult<()> {
         if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if v {
             try!(write!(self.writer, "true"));
@@ -611,22 +611,22 @@ impl<'a> ::Encoder for Encoder<'a> {
         Ok(())
     }
 
-    fn emit_f64(&mut self, v: f64) -> EncodeResult {
+    fn emit_f64(&mut self, v: f64) -> EncodeResult<()> {
         emit_enquoted_if_mapkey!(self, fmt_number_or_null(v))
     }
-    fn emit_f32(&mut self, v: f32) -> EncodeResult {
+    fn emit_f32(&mut self, v: f32) -> EncodeResult<()> {
         self.emit_f64(v as f64)
     }
 
-    fn emit_char(&mut self, v: char) -> EncodeResult {
+    fn emit_char(&mut self, v: char) -> EncodeResult<()> {
         escape_char(self.writer, v)
     }
-    fn emit_str(&mut self, v: &str) -> EncodeResult {
+    fn emit_str(&mut self, v: &str) -> EncodeResult<()> {
         escape_str(self.writer, v)
     }
 
-    fn emit_enum<F>(&mut self, _name: &str, f: F) -> EncodeResult where
-        F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
+    fn emit_enum<F>(&mut self, _name: &str, f: F) -> EncodeResult<()> where
+        F: FnOnce(&mut Encoder<'a>) -> EncodeResult<()>,
     {
         f(self)
     }
@@ -636,8 +636,8 @@ impl<'a> ::Encoder for Encoder<'a> {
                             _id: usize,
                             cnt: usize,
                             f: F)
-                            -> EncodeResult where
-        F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
+                            -> EncodeResult<()> where
+        F: FnOnce(&mut Encoder<'a>) -> EncodeResult<()>,
     {
         // enums are encoded as strings or objects
         // Bunny => "Bunny"
@@ -677,8 +677,8 @@ impl<'a> ::Encoder for Encoder<'a> {
         }
     }
 
-    fn emit_enum_variant_arg<F>(&mut self, idx: usize, f: F) -> EncodeResult where
-        F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
+    fn emit_enum_variant_arg<F>(&mut self, idx: usize, f: F) -> EncodeResult<()> where
+        F: FnOnce(&mut Encoder<'a>) -> EncodeResult<()>,
     {
         if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if idx != 0 {
@@ -697,8 +697,8 @@ impl<'a> ::Encoder for Encoder<'a> {
                                    name: &str,
                                    id: usize,
                                    cnt: usize,
-                                   f: F) -> EncodeResult where
-        F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
+                                   f: F) -> EncodeResult<()> where
+        F: FnOnce(&mut Encoder<'a>) -> EncodeResult<()>,
     {
         if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         self.emit_enum_variant(name, id, cnt, f)
@@ -707,16 +707,16 @@ impl<'a> ::Encoder for Encoder<'a> {
     fn emit_enum_struct_variant_field<F>(&mut self,
                                          _: &str,
                                          idx: usize,
-                                         f: F) -> EncodeResult where
-        F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
+                                         f: F) -> EncodeResult<()> where
+        F: FnOnce(&mut Encoder<'a>) -> EncodeResult<()>,
     {
         if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         self.emit_enum_variant_arg(idx, f)
     }
 
 
-    fn emit_struct<F>(&mut self, _: &str, len: usize, f: F) -> EncodeResult where
-        F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
+    fn emit_struct<F>(&mut self, _: &str, len: usize, f: F) -> EncodeResult<()> where
+        F: FnOnce(&mut Encoder<'a>) -> EncodeResult<()>,
     {
         if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if len == 0 {
@@ -737,8 +737,8 @@ impl<'a> ::Encoder for Encoder<'a> {
         Ok(())
     }
 
-    fn emit_struct_field<F>(&mut self, name: &str, idx: usize, f: F) -> EncodeResult where
-        F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
+    fn emit_struct_field<F>(&mut self, name: &str, idx: usize, f: F) -> EncodeResult<()> where
+        F: FnOnce(&mut Encoder<'a>) -> EncodeResult<()>,
     {
         if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if idx != 0 {
@@ -757,51 +757,51 @@ impl<'a> ::Encoder for Encoder<'a> {
         f(self)
     }
 
-    fn emit_tuple<F>(&mut self, len: usize, f: F) -> EncodeResult where
-        F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
+    fn emit_tuple<F>(&mut self, len: usize, f: F) -> EncodeResult<()> where
+        F: FnOnce(&mut Encoder<'a>) -> EncodeResult<()>,
     {
         if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         self.emit_seq(len, f)
     }
-    fn emit_tuple_arg<F>(&mut self, idx: usize, f: F) -> EncodeResult where
-        F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
+    fn emit_tuple_arg<F>(&mut self, idx: usize, f: F) -> EncodeResult<()> where
+        F: FnOnce(&mut Encoder<'a>) -> EncodeResult<()>,
     {
         if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         self.emit_seq_elt(idx, f)
     }
 
-    fn emit_tuple_struct<F>(&mut self, _: &str, len: usize, f: F) -> EncodeResult where
-        F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
+    fn emit_tuple_struct<F>(&mut self, _: &str, len: usize, f: F) -> EncodeResult<()> where
+        F: FnOnce(&mut Encoder<'a>) -> EncodeResult<()>,
     {
         if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         self.emit_seq(len, f)
     }
-    fn emit_tuple_struct_arg<F>(&mut self, idx: usize, f: F) -> EncodeResult where
-        F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
+    fn emit_tuple_struct_arg<F>(&mut self, idx: usize, f: F) -> EncodeResult<()> where
+        F: FnOnce(&mut Encoder<'a>) -> EncodeResult<()>,
     {
         if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         self.emit_seq_elt(idx, f)
     }
 
-    fn emit_option<F>(&mut self, f: F) -> EncodeResult where
-        F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
+    fn emit_option<F>(&mut self, f: F) -> EncodeResult<()> where
+        F: FnOnce(&mut Encoder<'a>) -> EncodeResult<()>,
     {
         if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         f(self)
     }
-    fn emit_option_none(&mut self) -> EncodeResult {
+    fn emit_option_none(&mut self) -> EncodeResult<()> {
         if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         self.emit_nil()
     }
-    fn emit_option_some<F>(&mut self, f: F) -> EncodeResult where
-        F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
+    fn emit_option_some<F>(&mut self, f: F) -> EncodeResult<()> where
+        F: FnOnce(&mut Encoder<'a>) -> EncodeResult<()>,
     {
         if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         f(self)
     }
 
-    fn emit_seq<F>(&mut self, len: usize, f: F) -> EncodeResult where
-        F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
+    fn emit_seq<F>(&mut self, len: usize, f: F) -> EncodeResult<()> where
+        F: FnOnce(&mut Encoder<'a>) -> EncodeResult<()>,
     {
         if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if len == 0 {
@@ -822,8 +822,8 @@ impl<'a> ::Encoder for Encoder<'a> {
         Ok(())
     }
 
-    fn emit_seq_elt<F>(&mut self, idx: usize, f: F) -> EncodeResult where
-        F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
+    fn emit_seq_elt<F>(&mut self, idx: usize, f: F) -> EncodeResult<()> where
+        F: FnOnce(&mut Encoder<'a>) -> EncodeResult<()>,
     {
         if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if idx != 0 {
@@ -836,8 +836,8 @@ impl<'a> ::Encoder for Encoder<'a> {
         f(self)
     }
 
-    fn emit_map<F>(&mut self, len: usize, f: F) -> EncodeResult where
-        F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
+    fn emit_map<F>(&mut self, len: usize, f: F) -> EncodeResult<()> where
+        F: FnOnce(&mut Encoder<'a>) -> EncodeResult<()>,
     {
         if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if len == 0 {
@@ -858,8 +858,8 @@ impl<'a> ::Encoder for Encoder<'a> {
         Ok(())
     }
 
-    fn emit_map_elt_key<F>(&mut self, idx: usize, f: F) -> EncodeResult where
-        F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
+    fn emit_map_elt_key<F>(&mut self, idx: usize, f: F) -> EncodeResult<()> where
+        F: FnOnce(&mut Encoder<'a>) -> EncodeResult<()>,
     {
         if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if idx != 0 {
@@ -875,8 +875,8 @@ impl<'a> ::Encoder for Encoder<'a> {
         Ok(())
     }
 
-    fn emit_map_elt_val<F>(&mut self, _idx: usize, f: F) -> EncodeResult where
-        F: FnOnce(&mut Encoder<'a>) -> EncodeResult,
+    fn emit_map_elt_val<F>(&mut self, _idx: usize, f: F) -> EncodeResult<()> where
+        F: FnOnce(&mut Encoder<'a>) -> EncodeResult<()>,
     {
         if self.is_emitting_map_key { return Err(EncoderError::BadHashmapKey); }
         if let EncodingFormat::Pretty{..} = self.format {
