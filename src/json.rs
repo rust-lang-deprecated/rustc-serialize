@@ -248,7 +248,7 @@ use std::num::{Float, Int};
 use std::ops::Index;
 use std::str::FromStr;
 use std::string;
-use std::{char, f64, fmt, io, num, str};
+use std::{char, f64, fmt, old_io, num, str};
 use std;
 use unicode::str as unicode_str;
 use unicode::str::Utf16Item;
@@ -302,7 +302,7 @@ pub enum ErrorCode {
 pub enum ParserError {
     /// msg, line, col
     SyntaxError(ErrorCode, usize, usize),
-    IoError(io::IoErrorKind, &'static str),
+    IoError(old_io::IoErrorKind, &'static str),
 }
 
 // Builder and Parser have the same errors.
@@ -373,7 +373,7 @@ impl fmt::Debug for ErrorCode {
     }
 }
 
-fn io_error_to_error(io: io::IoError) -> ParserError {
+fn io_error_to_error(io: old_io::IoError) -> ParserError {
     IoError(io.kind, io.desc)
 }
 
@@ -916,8 +916,8 @@ pub fn as_pretty_json<T: Encodable>(t: &T) -> AsPrettyJson<T> {
 }
 
 impl Json {
-    /// Decodes a json value from an `&mut io::Reader`
-    pub fn from_reader(rdr: &mut io::Reader) -> Result<Self, BuilderError> {
+    /// Decodes a json value from an `&mut old_io::Reader`
+    pub fn from_reader(rdr: &mut old_io::Reader) -> Result<Self, BuilderError> {
         let contents = match rdr.read_to_end() {
             Ok(c)  => c,
             Err(e) => return Err(io_error_to_error(e))
@@ -3339,7 +3339,7 @@ mod tests {
     #[test]
     fn test_encode_hashmap_with_numeric_key() {
         use std::str::from_utf8;
-        use std::io::Writer;
+        use std::old_io::Writer;
         use std::collections::HashMap;
         let mut hm: HashMap<usize, bool> = HashMap::new();
         hm.insert(1, true);
@@ -3355,7 +3355,7 @@ mod tests {
     #[test]
     fn test_prettyencode_hashmap_with_numeric_key() {
         use std::str::from_utf8;
-        use std::io::Writer;
+        use std::old_io::Writer;
         use std::collections::HashMap;
         let mut hm: HashMap<usize, bool> = HashMap::new();
         hm.insert(1, true);
@@ -3809,7 +3809,7 @@ mod tests {
 
     #[test]
     fn test_encode_hashmap_with_arbitrary_key() {
-        use std::io::Writer;
+        use std::old_io::Writer;
         use std::collections::HashMap;
         use std::fmt;
         #[derive(PartialEq, Eq, Hash, RustcEncodable)]
