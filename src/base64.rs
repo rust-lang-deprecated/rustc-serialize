@@ -251,16 +251,10 @@ impl FromBase64 for [u8] {
         let mut buf: u32 = 0;
         let mut modulus = 0;
 
-        let it = self.iter().enumerate();
-        let mut tail = false;
-        for (idx, &byte) in it {
+        let mut it = self.iter().enumerate();
+        for (idx, &byte) in it.by_ref() {
             let val = byte as u32;
-            if tail {
-              match byte {
-                b'=' | b'\r' | b'\n' => continue,
-                _ => return Err(InvalidBase64Byte(self[idx], idx)),
-              }
-            }
+
             match byte {
                 b'A'...b'Z' => buf |= val - 0x41,
                 b'a'...b'z' => buf |= val - 0x47,
@@ -268,10 +262,7 @@ impl FromBase64 for [u8] {
                 b'+' | b'-' => buf |= 0x3E,
                 b'/' | b'_' => buf |= 0x3F,
                 b'\r' | b'\n' => continue,
-                b'=' => {
-                  tail = true;
-                  continue;               
-                },
+                b'=' => break,
                 _ => return Err(InvalidBase64Byte(self[idx], idx)),
             }
 
@@ -282,6 +273,13 @@ impl FromBase64 for [u8] {
                 r.push((buf >> 22) as u8);
                 r.push((buf >> 14) as u8);
                 r.push((buf >> 6 ) as u8);
+            }
+        }
+
+        for (idx, &byte) in it {
+            match byte {
+                b'=' | b'\r' | b'\n' => continue,
+                _ => return Err(InvalidBase64Byte(self[idx], idx)),
             }
         }
 
