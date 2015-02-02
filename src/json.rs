@@ -2011,8 +2011,8 @@ macro_rules! read_primitive {
                 // re: #12967.. a type w/ numeric keys (ie HashMap<usize, V> etc)
                 // is going to have a string here, as per JSON spec.
                 Json::String(s) => match s.parse() {
-                    Some(f) => Ok(f),
-                    None => Err(ExpectedError("Number".to_string(), s)),
+                    Ok(f)  => Ok(f),
+                    Err(_) => Err(ExpectedError("Number".to_string(), s)),
                 },
                 value => Err(ExpectedError("Number".to_string(), format!("{}", value))),
             }
@@ -2049,8 +2049,8 @@ impl ::Decoder for Decoder {
                 // re: #12967.. a type w/ numeric keys (ie HashMap<usize, V> etc)
                 // is going to have a string here, as per JSON spec.
                 match s.parse() {
-                    Some(f) => Ok(f),
-                    None => Err(ExpectedError("Number".to_string(), s)),
+                    Ok(f)  => Ok(f),
+                    Err(_) => Err(ExpectedError("Number".to_string(), s)),
                 }
             },
             Json::Null => Ok(f64::NAN),
@@ -2482,8 +2482,9 @@ impl<'a, T: Encodable> fmt::Display for AsPrettyJson<'a, T> {
 }
 
 impl FromStr for Json {
-    fn from_str(s: &str) -> Option<Json> {
-        Json::from_str(s).ok()
+    type Err = ParserError;
+    fn from_str(s: &str) -> Result<Json, ParserError> {
+        Json::from_str(s)
     }
 }
 
@@ -3816,7 +3817,7 @@ mod tests {
         struct ArbitraryType(u32);
         let mut hm: HashMap<ArbitraryType, bool> = HashMap::new();
         hm.insert(ArbitraryType(1), true);
-        let mut mem_buf = Vec::new();
+        let mut mem_buf = string::String::new();
         let mut encoder = Encoder::new(&mut mem_buf as &mut fmt::Writer);
         let result = hm.encode(&mut encoder);
         match result.err().unwrap() {
