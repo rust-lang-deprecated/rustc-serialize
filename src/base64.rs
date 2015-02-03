@@ -252,7 +252,7 @@ impl FromBase64 for [u8] {
         let mut modulus = 0;
 
         let mut it = self.iter().enumerate();
-        for (idx, &byte) in it {
+        for (idx, &byte) in it.by_ref() {
             let val = byte as u32;
 
             match byte {
