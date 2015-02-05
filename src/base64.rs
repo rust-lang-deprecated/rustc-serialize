@@ -396,7 +396,7 @@ mod tests {
 
     #[test]
     fn test_base64_random() {
-        use std::rand::{thread_rng, Rng};
+        use rand::{thread_rng, Rng};
 
         for _ in range(0, 1000) {
             let times = thread_rng().gen_range(1, 100);

@@ -13,3 +13,6 @@ Generic serialization/deserialization support corresponding to the
 `derive(RustcEncodable, RustcDecodable)` mode in the compiler. Also includes
 support for hex, base64, and json encoding and decoding.
 """
+
+[dev-dependencies]
+rand = "0.1"
