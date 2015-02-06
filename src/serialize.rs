@@ -14,7 +14,7 @@
 Core encoding and decoding interfaces.
 */
 
-use std::old_path as path;
+use std::path;
 use std::rc::Rc;
 use std::cell::{Cell, RefCell};
 use std::sync::Arc;
