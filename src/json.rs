@@ -1002,6 +1002,15 @@ impl Json {
         }
     }
 
+    /// If the Json value is an Object, returns the associated mutable BTreeMap.
+    /// Returns None otherwise.
+    pub fn as_object_mut<'a>(&'a mut self) -> Option<&'a mut Object> {
+        match self {
+            &mut Json::Object(ref mut map) => Some(map),
+            _ => None
+        }
+    }
+
     /// Returns true if the Json value is an Array. Returns false otherwise.
     pub fn is_array<'a>(&'a self) -> bool {
         self.as_array().is_some()
@@ -1012,6 +1021,15 @@ impl Json {
     pub fn as_array<'a>(&'a self) -> Option<&'a Array> {
         match self {
             &Json::Array(ref array) => Some(&*array),
+            _ => None
+        }
+    }
+
+    /// If the Json value is an Array, returns the associated mutable vector.
+    /// Returns None otherwise.
+    pub fn as_array_mut<'a>(&'a mut self) -> Option<&'a mut Array> {
+        match self {
+            &mut Json::Array(ref mut list) => Some(list),
             _ => None
         }
     }
