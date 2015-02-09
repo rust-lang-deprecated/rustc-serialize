@@ -113,7 +113,7 @@ impl ToBase64 for [u8] {
             let (first, second, third) = (self[i], self[i + 1], self[i + 2]);
             if let Some(line_length) = config.line_length {
                 if cur_length >= line_length {
-                    v.push_all(newline);
+                    v.extend(newline.iter().map(|x| *x));
                     cur_length = 0;
                 }
             }
@@ -135,7 +135,7 @@ impl ToBase64 for [u8] {
         if mod_len != 0 {
             if let Some(line_length) = config.line_length {
                 if cur_length >= line_length {
-                    v.push_all(newline);
+                    v.extend(newline.iter().map(|x| *x));
                 }
             }
         }
@@ -230,7 +230,7 @@ impl FromBase64 for str {
     /// fn main () {
     ///     let hello_str = b"Hello, World".to_base64(STANDARD);
     ///     println!("base64 output: {}", hello_str);
-    ///     let res = hello_str.as_slice().from_base64();
+    ///     let res = hello_str.from_base64();
     ///     if res.is_ok() {
     ///       let opt_bytes = String::from_utf8(res.unwrap());
     ///       if opt_bytes.is_ok() {
@@ -330,7 +330,6 @@ mod tests {
         assert!(![08; 1000].to_base64(Config {line_length: None,
                                                  newline: Newline::LF,
                                                  ..STANDARD})
-                              .as_slice()
                               .contains("\n"));
         assert_eq!(b"foobar".to_base64(Config {line_length: Some(4),
                                                newline: Newline::LF,
@@ -398,7 +397,7 @@ mod tests {
     fn test_base64_random() {
         use rand::{thread_rng, Rng};
 
-        for _ in range(0, 1000) {
+        for _ in 0..1000 {
             let times = thread_rng().gen_range(1, 100);
             let v = thread_rng().gen_iter::<u8>().take(times)
                                 .collect::<Vec<_>>();

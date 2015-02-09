@@ -192,14 +192,14 @@ mod tests {
 
     #[test]
     pub fn test_to_hex_all_bytes() {
-        for i in range(0, 256) {
+        for i in 0..256 {
             assert_eq!([i as u8].to_hex(), format!("{:02x}", i));
         }
     }
 
     #[test]
     pub fn test_from_hex_all_bytes() {
-        for i in range(0, 256) {
+        for i in 0..256 {
             let ii: &[u8] = &[i as u8];
             assert_eq!(format!("{:02x}", i).from_hex().unwrap(),
                        ii);

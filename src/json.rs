@@ -108,7 +108,7 @@
 //!     let encoded = json::encode(&object).unwrap();
 //!
 //!     // Deserialize using `json::decode`
-//!     let decoded: TestStruct = json::decode(encoded.as_slice()).unwrap();
+//!     let decoded: TestStruct = json::decode(&encoded).unwrap();
 //! }
 //! ```
 //!
@@ -196,7 +196,7 @@
 //!     let json_str: String = json_obj.to_string();
 //!
 //!     // Deserialize like before
-//!     let decoded: TestStruct = json::decode(json_str.as_slice()).unwrap();
+//!     let decoded: TestStruct = json::decode(&json_str).unwrap();
 //! }
 //! ```
 //!
@@ -508,7 +508,7 @@ fn fmt_number_or_null(v: f64) -> string::String {
     use std::num::FpCategory::{Nan, Infinite};
 
     match v.classify() {
-        Nan | Infinite => string::String::from_str("null"),
+        Nan | Infinite => "null".to_string(),
         _ if v.fract() != 0f64 => f64::to_str_digits(v, 6),
         _ => f64::to_str_digits(v, 6) + ".0",
     }
@@ -922,7 +922,7 @@ impl Json {
             Ok(c)  => c,
             Err(e) => return Err(io_error_to_error(e))
         };
-        let s = match str::from_utf8(contents.as_slice()).ok() {
+        let s = match str::from_utf8(&contents).ok() {
             Some(s) => s,
             _       => return Err(SyntaxError(NotUtf8, 0, 0))
         };
@@ -1245,7 +1245,7 @@ impl Stack {
     /// Compares this stack with an array of StackElements.
     pub fn is_equal_to(&self, rhs: &[StackElement]) -> bool {
         if self.stack.len() != rhs.len() { return false; }
-        for i in range(0, rhs.len()) {
+        for i in 0..rhs.len() {
             if self.get(i) != rhs[i] { return false; }
         }
         return true;
@@ -1255,7 +1255,7 @@ impl Stack {
     /// the ones passed as parameter.
     pub fn starts_with(&self, rhs: &[StackElement]) -> bool {
         if self.stack.len() < rhs.len() { return false; }
-        for i in range(0, rhs.len()) {
+        for i in 0..rhs.len() {
             if self.get(i) != rhs[i] { return false; }
         }
         return true;
@@ -1266,7 +1266,7 @@ impl Stack {
     pub fn ends_with(&self, rhs: &[StackElement]) -> bool {
         if self.stack.len() < rhs.len() { return false; }
         let offset = self.stack.len() - rhs.len();
-        for i in range(0, rhs.len()) {
+        for i in 0..rhs.len() {
             if self.get(i + offset) != rhs[i] { return false; }
         }
         return true;
@@ -3415,7 +3415,7 @@ mod tests {
         }
 
         // Test up to 4 spaces of indents (more?)
-        for i in range(0, 4us) {
+        for i in 0..4 {
             let mut writer = Vec::new();
             write!(&mut writer, "{}",
                    super::as_pretty_json(&json).indent(i as u32)).unwrap();
@@ -3466,7 +3466,7 @@ mod tests {
         map.insert(Enum::Foo, 0);
         let result = json::encode(&map).unwrap();
         assert_eq!(&result[], r#"{"Foo":0}"#);
-        let decoded: HashMap<Enum, _> = json::decode(result.as_slice()).unwrap();
+        let decoded: HashMap<Enum, _> = json::decode(&result).unwrap();
         assert_eq!(map, decoded);
     }
 
@@ -3494,7 +3494,7 @@ mod tests {
                 None => { break; }
             };
             let (ref expected_evt, ref expected_stack) = expected[i];
-            if !parser.stack().is_equal_to(expected_stack.as_slice()) {
+            if !parser.stack().is_equal_to(&expected_stack) {
                 panic!("Parser stack is not equal to {:?}", expected_stack);
             }
             assert_eq!(&evt, expected_evt);
@@ -3881,7 +3881,7 @@ mod tests {
 
     fn big_json() -> string::String {
         let mut src = "[\n".to_string();
-        for _ in range(0, 500) {
+        for _ in 0..500 {
             src.push_str(r#"{ "a": true, "b": null, "c":3.1415, "d": "Hello world", "e": \
                             [1,2,3]},"#);
         }
@@ -3905,6 +3905,6 @@ mod tests {
     #[bench]
     fn bench_large(b: &mut Bencher) {
         let src = big_json();
-        b.iter( || { let _ = Json::from_str(src.as_slice()); });
+        b.iter( || { let _ = Json::from_str(&src); });
     }
 }
