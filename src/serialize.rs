@@ -570,7 +570,7 @@ impl Encodable for path::Path {
     #[cfg(unix)]
     fn encode<S: Encoder>(&self, e: &mut S) -> Result<(), S::Error> {
         use std::os::unix::OsStrExt;
-        self.as_os_str().as_byte_slice().encode(e)
+        self.as_os_str().as_bytes().encode(e)
     }
     #[cfg(windows)]
     fn encode<S: Encoder>(&self, e: &mut S) -> Result<(), S::Error> {
