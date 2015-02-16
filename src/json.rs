@@ -32,7 +32,7 @@
 //! * `Array`: equivalent to rust's `Vec<T>`, but also allowing objects of
 //!   different types in the
 //!   same array
-//! * `Object`: equivalent to rust's `BTreeMap<String, json::Json>`
+//! * `Object`: equivalent to rust's `HashMap<String, json::Json>`
 //! * `Null`
 //!
 //! An object is a series of string keys mapping to values, in `"key": value`
@@ -162,7 +162,7 @@
 //! ```rust
 //! # #![allow(unstable)]
 //! extern crate "rustc-serialize" as rustc_serialize;
-//! use std::collections::BTreeMap;
+//! use std::collections::HashMap;
 //! use rustc_serialize::json::{self, Json, ToJson};
 //!
 //! // Only generate `Decodable` trait implementation
@@ -176,7 +176,7 @@
 //! // Specify encoding method manually
 //! impl ToJson for TestStruct {
 //!     fn to_json(&self) -> Json {
-//!         let mut d = BTreeMap::new();
+//!         let mut d = HashMap::new();
 //!         // All standard types implement `to_json()`, so use it
 //!         d.insert("data_int".to_string(), self.data_int.to_json());
 //!         d.insert("data_str".to_string(), self.data_str.to_json());
@@ -256,7 +256,7 @@ use unicode::str::Utf16Item;
 use Encodable;
 
 /// Represents a json value
-#[derive(Clone, PartialEq, PartialOrd, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Json {
     I64(i64),
     U64(u64),
@@ -269,7 +269,7 @@ pub enum Json {
 }
 
 pub type Array = Vec<Json>;
-pub type Object = BTreeMap<string::String, Json>;
+pub type Object = HashMap<string::String, Json>;
 
 pub struct PrettyJson<'a> { inner: &'a Json }
 
@@ -993,7 +993,7 @@ impl Json {
         self.as_object().is_some()
     }
 
-    /// If the Json value is an Object, returns the associated BTreeMap.
+    /// If the Json value is an Object, returns the associated HashMap.
     /// Returns None otherwise.
     pub fn as_object<'a>(&'a self) -> Option<&'a Object> {
         match self {
@@ -1002,7 +1002,7 @@ impl Json {
         }
     }
 
-    /// If the Json value is an Object, returns the associated mutable BTreeMap.
+    /// If the Json value is an Object, returns the associated mutable HashMap.
     /// Returns None otherwise.
     pub fn as_object_mut<'a>(&'a mut self) -> Option<&'a mut Object> {
         match self {
@@ -1953,7 +1953,7 @@ impl<T: Iterator<Item = char>> Builder<T> {
     fn build_object(&mut self) -> Result<Json, BuilderError> {
         self.bump();
 
-        let mut values = BTreeMap::new();
+        let mut values = HashMap::new();
 
         loop {
             match self.token {
@@ -2399,7 +2399,7 @@ impl<A: ToJson> ToJson for Vec<A> {
 
 impl<A: ToJson> ToJson for BTreeMap<string::String, A> {
     fn to_json(&self) -> Json {
-        let mut d = BTreeMap::new();
+        let mut d = HashMap::new();
         for (key, value) in self.iter() {
             d.insert((*key).clone(), value.to_json());
         }
@@ -2409,7 +2409,7 @@ impl<A: ToJson> ToJson for BTreeMap<string::String, A> {
 
 impl<A: ToJson> ToJson for HashMap<string::String, A> {
     fn to_json(&self) -> Json {
-        let mut d = BTreeMap::new();
+        let mut d = HashMap::new();
         for (key, value) in self.iter() {
             d.insert((*key).clone(), value.to_json());
         }
@@ -2522,7 +2522,7 @@ mod tests {
     use super::{Json, DecodeResult, DecoderError, JsonEvent, Parser,
                 StackElement, Stack, Decoder, Encoder, EncoderError};
     use std::{i64, u64, f32, f64};
-    use std::collections::BTreeMap;
+    use std::collections::HashMap;
     use std::num::Float;
     use std::string;
 
@@ -2572,7 +2572,7 @@ mod tests {
     }
 
     fn mk_object(items: &[(string::String, Json)]) -> Json {
-        let mut d = BTreeMap::new();
+        let mut d = HashMap::new();
 
         for item in items.iter() {
             match *item {
@@ -3122,7 +3122,7 @@ mod tests {
     fn test_decode_map() {
         let s = "{\"a\": \"Dog\", \"b\": {\"variant\":\"Frog\",\
                   \"fields\":[\"Henry\", 349]}}";
-        let mut map: BTreeMap<string::String, Animal> = super::decode(s).unwrap();
+        let mut map: HashMap<string::String, Animal> = super::decode(s).unwrap();
 
         assert_eq!(map.remove(&"a".to_string()), Some(Dog));
         assert_eq!(map.remove(&"b".to_string()), Some(Frog("Henry".to_string(), 349)));
@@ -3390,9 +3390,9 @@ mod tests {
     #[test]
     fn test_prettyencoder_indent_level_param() {
         use std::str::from_utf8;
-        use std::collections::BTreeMap;
+        use std::collections::HashMap;
 
-        let mut tree = BTreeMap::new();
+        let mut tree = HashMap::new();
 
         tree.insert("hello".to_string(), String("guten tag".to_string()));
         tree.insert("goodbye".to_string(), String("sayonara".to_string()));
@@ -3774,13 +3774,13 @@ mod tests {
 
     #[test]
     fn test_to_json() {
-        use std::collections::{HashMap,BTreeMap};
+        use std::collections::HashMap;
         use super::ToJson;
 
         let array2 = Array(vec!(U64(1), U64(2)));
         let array3 = Array(vec!(U64(1), U64(2), U64(3)));
         let object = {
-            let mut tree_map = BTreeMap::new();
+            let mut tree_map = HashMap::new();
             tree_map.insert("a".to_string(), U64(1));
             tree_map.insert("b".to_string(), U64(2));
             Object(tree_map)
@@ -3813,7 +3813,7 @@ mod tests {
         assert_eq!((&[1us, 2us, 3us]).to_json(), array3);
         assert_eq!((vec![1us, 2]).to_json(), array2);
         assert_eq!(vec!(1us, 2, 3).to_json(), array3);
-        let mut tree_map = BTreeMap::new();
+        let mut tree_map = HashMap::new();
         tree_map.insert("a".to_string(), 1us);
         tree_map.insert("b".to_string(), 2);
         assert_eq!(tree_map.to_json(), object);
