@@ -26,8 +26,10 @@
 //! Data types that can be encoded are JavaScript types (see the `Json` enum
 //! for more details):
 //!
+//! * `I64`: equivalent to rust's `i64`
+//! * `U64`: equivalent to rust's `u64`
+//! * `F64`: equivalent to rust's `f64`
 //! * `Boolean`: equivalent to rust's `bool`
-//! * `Number`: equivalent to rust's `f64`
 //! * `String`: equivalent to rust's `String`
 //! * `Array`: equivalent to rust's `Vec<T>`, but also allowing objects of
 //!   different types in the
