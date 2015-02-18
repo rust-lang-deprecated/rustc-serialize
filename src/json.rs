@@ -422,7 +422,7 @@ impl std::error::FromError<fmt::Error> for EncoderError {
 pub type EncodeResult<T> = Result<T, EncoderError>;
 pub type DecodeResult<T> = Result<T, DecoderError>;
 
-fn escape_str(wr: &mut fmt::Writer, v: &str) -> EncodeResult<()> {
+fn escape_str(wr: &mut fmt::Write, v: &str) -> EncodeResult<()> {
     try!(wr.write_str("\""));
 
     let mut start = 0;
@@ -484,14 +484,14 @@ fn escape_str(wr: &mut fmt::Writer, v: &str) -> EncodeResult<()> {
     Ok(())
 }
 
-fn escape_char(writer: &mut fmt::Writer, v: char) -> EncodeResult<()> {
+fn escape_char(writer: &mut fmt::Write, v: char) -> EncodeResult<()> {
     let mut buf = [0; 4];
     let n = v.encode_utf8(&mut buf).unwrap();
     let buf = unsafe { str::from_utf8_unchecked(&buf[..n]) };
     escape_str(writer, buf)
 }
 
-fn spaces(wr: &mut fmt::Writer, n: u32) -> EncodeResult<()> {
+fn spaces(wr: &mut fmt::Write, n: u32) -> EncodeResult<()> {
     let mut n = n as usize;
     const BUF: &'static str = "                ";
 
@@ -538,7 +538,7 @@ enum EncodingFormat {
 
 /// A structure for implementing serialization to JSON.
 pub struct Encoder<'a> {
-    writer: &'a mut (fmt::Writer+'a),
+    writer: &'a mut (fmt::Write+'a),
     format : EncodingFormat,
     is_emitting_map_key: bool,
 }
@@ -546,7 +546,7 @@ pub struct Encoder<'a> {
 impl<'a> Encoder<'a> {
     /// Creates a new encoder whose output will be written in human-readable
     /// JSON to the specified writer
-    pub fn new_pretty(writer: &'a mut fmt::Writer) -> Encoder<'a> {
+    pub fn new_pretty(writer: &'a mut fmt::Write) -> Encoder<'a> {
         Encoder {
             writer: writer,
             format: EncodingFormat::Pretty {
@@ -559,7 +559,7 @@ impl<'a> Encoder<'a> {
 
     /// Creates a new encoder whose output will be written in compact
     /// JSON to the specified writer
-    pub fn new(writer: &'a mut fmt::Writer) -> Encoder<'a> {
+    pub fn new(writer: &'a mut fmt::Write) -> Encoder<'a> {
         Encoder {
             writer: writer,
             format: EncodingFormat::Compact,
@@ -2432,7 +2432,7 @@ struct FormatShim<'a, 'b: 'a> {
     inner: &'a mut fmt::Formatter<'b>,
 }
 
-impl<'a, 'b> fmt::Writer for FormatShim<'a, 'b> {
+impl<'a, 'b> fmt::Write for FormatShim<'a, 'b> {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         match self.inner.write_str(s) {
             Ok(_) => Ok(()),
@@ -3830,7 +3830,6 @@ mod tests {
 
     #[test]
     fn test_encode_hashmap_with_arbitrary_key() {
-        use std::old_io::Writer;
         use std::collections::HashMap;
         use std::fmt;
         #[derive(PartialEq, Eq, Hash, RustcEncodable)]
@@ -3838,7 +3837,7 @@ mod tests {
         let mut hm: HashMap<ArbitraryType, bool> = HashMap::new();
         hm.insert(ArbitraryType(1), true);
         let mut mem_buf = string::String::new();
-        let mut encoder = Encoder::new(&mut mem_buf as &mut fmt::Writer);
+        let mut encoder = Encoder::new(&mut mem_buf as &mut fmt::Write);
         let result = hm.encode(&mut encoder);
         match result.err().unwrap() {
             EncoderError::BadHashmapKey => (),
