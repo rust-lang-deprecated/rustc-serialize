@@ -1045,7 +1045,7 @@ impl Json {
     /// Returns None otherwise.
     pub fn as_string<'a>(&'a self) -> Option<&'a str> {
         match *self {
-            Json::String(ref s) => Some(&s[]),
+            Json::String(ref s) => Some(&s),
             _ => None
         }
     }
@@ -2140,7 +2140,7 @@ impl ::Decoder for Decoder {
                 return Err(ExpectedError("String or Object".to_string(), format!("{}", json)))
             }
         };
-        let idx = match names.iter().position(|n| *n == &name[]) {
+        let idx = match names.iter().position(|n| *n == name) {
             Some(idx) => idx,
             None => return Err(UnknownVariantError(name))
         };
@@ -3366,7 +3366,7 @@ mod tests {
         hm.insert(1, true);
         let mut mem_buf = Vec::new();
         write!(&mut mem_buf, "{}", super::as_pretty_json(&hm)).unwrap();
-        let json_str = from_utf8(&mem_buf[]).unwrap();
+        let json_str = from_utf8(&mem_buf).unwrap();
         match Json::from_str(json_str) {
             Err(_) => panic!("Unable to parse json_str: {}", json_str),
             _ => {} // it parsed and we are good to go
@@ -3382,7 +3382,7 @@ mod tests {
         hm.insert(1, true);
         let mut mem_buf = Vec::new();
         write!(&mut mem_buf, "{}", super::as_pretty_json(&hm)).unwrap();
-        let json_str = from_utf8(&mem_buf[]).unwrap();
+        let json_str = from_utf8(&mem_buf).unwrap();
         match Json::from_str(json_str) {
             Err(_) => panic!("Unable to parse json_str: {}", json_str),
             _ => {} // it parsed and we are good to go
@@ -3422,7 +3422,7 @@ mod tests {
             write!(&mut writer, "{}",
                    super::as_pretty_json(&json).indent(i as u32)).unwrap();
 
-            let printed = from_utf8(&writer[]).unwrap();
+            let printed = from_utf8(&writer).unwrap();
 
             // Check for indents at each line
             let lines: Vec<&str> = printed.lines().collect();
