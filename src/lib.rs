@@ -15,7 +15,7 @@
        html_favicon_url = "http://www.rust-lang.org/favicon.ico",
        html_root_url = "http://doc.rust-lang.org/rustc-serialize/")]
 #![cfg_attr(test, deny(warnings))]
-#![cfg_attr(test, feature(test, hash))]
+#![cfg_attr(test, feature(test))]
 
 #[cfg(test)] extern crate test;
 #[cfg(test)] extern crate rand;
