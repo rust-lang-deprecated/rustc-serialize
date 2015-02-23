@@ -250,7 +250,7 @@ use std::num::{Float, Int};
 use std::ops::Index;
 use std::str::FromStr;
 use std::string;
-use std::{char, f64, fmt, old_io, num, str};
+use std::{char, f64, fmt, io, num, str};
 use std;
 use unicode::str as unicode_str;
 use unicode::str::Utf16Item;
@@ -300,11 +300,11 @@ pub enum ErrorCode {
     NotUtf8,
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum ParserError {
     /// msg, line, col
     SyntaxError(ErrorCode, usize, usize),
-    IoError(old_io::IoErrorKind, &'static str),
+    IoError(io::Error),
 }
 
 // Builder and Parser have the same errors.
@@ -375,8 +375,8 @@ impl fmt::Debug for ErrorCode {
     }
 }
 
-fn io_error_to_error(io: old_io::IoError) -> ParserError {
-    IoError(io.kind, io.desc)
+fn io_error_to_error(err: io::Error) -> ParserError {
+    IoError(err)
 }
 
 impl StdError for DecoderError {
@@ -918,11 +918,15 @@ pub fn as_pretty_json<T: Encodable>(t: &T) -> AsPrettyJson<T> {
 }
 
 impl Json {
-    /// Decodes a json value from an `&mut old_io::Reader`
-    pub fn from_reader(rdr: &mut old_io::Reader) -> Result<Self, BuilderError> {
-        let contents = match rdr.read_to_end() {
-            Ok(c)  => c,
-            Err(e) => return Err(io_error_to_error(e))
+    /// Decodes a json value from an `&mut io::Read`
+    pub fn from_reader(rdr: &mut io::Read) -> Result<Self, BuilderError> {
+        let contents = {
+            let mut c = Vec::new();
+            match rdr.read_to_end(&mut c) {
+                Ok(c)  => c,
+                Err(e) => return Err(io_error_to_error(e))
+            }
+            c
         };
         let s = match str::from_utf8(&contents).ok() {
             Some(s) => s,
@@ -1905,7 +1909,7 @@ impl<T: Iterator<Item = char>> Builder<T> {
         self.bump();
         match self.token {
             None => {}
-            Some(Error(e)) => { return Err(e); }
+            Some(Error(ref e)) => { return Err(e.clone()); }
             ref tok => { panic!("unexpected token {:?}", tok.clone()); }
         }
         result
@@ -1927,7 +1931,7 @@ impl<T: Iterator<Item = char>> Builder<T> {
                 swap(s, &mut temp);
                 Ok(Json::String(temp))
             }
-            Some(Error(e)) => Err(e),
+            Some(Error(ref e)) => Err(e.clone()),
             Some(ArrayStart) => self.build_array(),
             Some(ObjectStart) => self.build_object(),
             Some(ObjectEnd) => self.parser.error(InvalidSyntax),
@@ -1960,7 +1964,7 @@ impl<T: Iterator<Item = char>> Builder<T> {
         loop {
             match self.token {
                 Some(ObjectEnd) => { return Ok(Json::Object(values)); }
-                Some(Error(e)) => { return Err(e); }
+                Some(Error(ref e)) => { return Err(e.clone()); }
                 None => { break; }
                 _ => {}
             }
@@ -3360,7 +3364,7 @@ mod tests {
     #[test]
     fn test_encode_hashmap_with_numeric_key() {
         use std::str::from_utf8;
-        use std::old_io::Writer;
+        // use std::io::Write;
         use std::collections::HashMap;
         let mut hm: HashMap<usize, bool> = HashMap::new();
         hm.insert(1, true);
@@ -3376,7 +3380,7 @@ mod tests {
     #[test]
     fn test_prettyencode_hashmap_with_numeric_key() {
         use std::str::from_utf8;
-        use std::old_io::Writer;
+        // use std::io::Write;
         use std::collections::HashMap;
         let mut hm: HashMap<usize, bool> = HashMap::new();
         hm.insert(1, true);
