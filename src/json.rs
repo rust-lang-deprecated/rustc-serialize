@@ -3364,7 +3364,6 @@ mod tests {
     #[test]
     fn test_encode_hashmap_with_numeric_key() {
         use std::str::from_utf8;
-        // use std::io::Write;
         use std::collections::HashMap;
         let mut hm: HashMap<usize, bool> = HashMap::new();
         hm.insert(1, true);
@@ -3380,7 +3379,6 @@ mod tests {
     #[test]
     fn test_prettyencode_hashmap_with_numeric_key() {
         use std::str::from_utf8;
-        // use std::io::Write;
         use std::collections::HashMap;
         let mut hm: HashMap<usize, bool> = HashMap::new();
         hm.insert(1, true);
