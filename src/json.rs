@@ -375,10 +375,6 @@ impl fmt::Debug for ErrorCode {
     }
 }
 
-fn io_error_to_error(err: io::Error) -> ParserError {
-    IoError(err)
-}
-
 impl StdError for DecoderError {
     fn description(&self) -> &str { "decoder error" }
     fn cause(&self) -> Option<&StdError> {
@@ -920,19 +916,33 @@ pub fn as_pretty_json<T: Encodable>(t: &T) -> AsPrettyJson<T> {
 impl Json {
     /// Decodes a json value from an `&mut io::Read`
     pub fn from_reader(rdr: &mut io::Read) -> Result<Self, BuilderError> {
-        let contents = {
-            let mut c = Vec::new();
-            match rdr.read_to_end(&mut c) {
-                Ok(c)  => c,
-                Err(e) => return Err(io_error_to_error(e))
+        use std::io::{ReadExt, CharsError};
+        
+        struct Adapter<Iter> {
+            iter: Iter,
+            err: Option<CharsError>,
+        }
+
+        impl<Iter: Iterator<Item=Result<char, CharsError>>> Iterator for Adapter<Iter> {
+            type Item = char;
+
+            #[inline]
+            fn next(&mut self) -> Option<char> {
+                match self.iter.next() {
+                    Some(Ok(value)) => Some(value),
+                    Some(Err(err)) => {
+                        self.err = Some(err);
+                        None
+                    }
+                    None => None,
+                }
             }
-            c
+        }
+        let ada = Adapter {
+            iter: rdr.chars(),
+            err: None,
         };
-        let s = match str::from_utf8(&contents).ok() {
-            Some(s) => s,
-            _       => return Err(SyntaxError(NotUtf8, 0, 0))
-        };
-        let mut builder = Builder::new(s.chars());
+        let mut builder = Builder::new(ada);
         builder.build()
     }
 
