@@ -3920,4 +3920,24 @@ mod tests {
         let src = big_json();
         b.iter( || { let _ = Json::from_str(&src); });
     }
+
+    #[bench]
+    fn bench_large_file(b: &mut Bencher) {
+        use std::fs::File;
+        use std::io::BufReader;
+        let f = File::open("src/big_file.json").unwrap();
+        let mut buf = BufReader::new(f);
+        b.iter( || { let _ = Json::from_reader(&mut buf); });
+    }
+
+    #[bench]
+    fn bench_large_file_reopening(b: &mut Bencher) {
+        use std::fs::File;
+        use std::io::BufReader;
+        b.iter( || {
+        	let f = File::open("src/big_file.json").unwrap();
+        	let mut buf = BufReader::new(f);
+            let _ = Json::from_reader(&mut buf);
+        });
+    }
 }
