@@ -305,6 +305,11 @@ pub enum ParserError {
     /// msg, line, col
     SyntaxError(ErrorCode, usize, usize),
     IoError(io::Error),
+    CharError,
+}
+
+impl std::error::FromError<io::Error> for ParserError {
+    fn from_error(err: io::Error) -> ParserError { ParserError::IoError(err) }
 }
 
 // Builder and Parser have the same errors.
@@ -915,35 +920,56 @@ pub fn as_pretty_json<T: Encodable>(t: &T) -> AsPrettyJson<T> {
 
 impl Json {
     /// Decodes a json value from an `&mut io::Read`
-    pub fn from_reader(rdr: &mut io::Read) -> Result<Self, BuilderError> {
-        use std::io::{ReadExt, CharsError};
-        
-        struct Adapter<Iter> {
-            iter: Iter,
-            err: Option<CharsError>,
+    pub fn from_reader(rdr: &mut io::BufRead) -> Result<Self, BuilderError> {
+
+        use std::io::BufRead;
+        struct Chars<R: BufRead> {
+            inner: R,
+            err: Option<BuilderError>,
         }
 
-        impl<Iter: Iterator<Item=Result<char, CharsError>>> Iterator for Adapter<Iter> {
+        impl<R: BufRead> Iterator for Chars<R> {
             type Item = char;
-
-            #[inline]
+        
+        	#[inline]
             fn next(&mut self) -> Option<char> {
-                match self.iter.next() {
-                    Some(Ok(value)) => Some(value),
-                    Some(Err(err)) => {
-                        self.err = Some(err);
-                        None
-                    }
-                    None => None,
-                }
+                use unicode::str::utf8_char_width;
+                let (w, res) = {
+                    let buf = match self.inner.fill_buf() {
+                        Ok([]) => return None,
+                        Ok(buf) => buf,
+                        Err(err) => {
+                            self.err = Some(IoError(err));
+                            return None;
+                        },
+                    };
+                    let width = utf8_char_width(buf[0]);
+                    let res = match str::from_utf8(&buf[..width]).ok() {
+                        Some(s) => s.char_at(0),
+                        None => {
+                            self.err = Some(CharError);
+                            return None;
+                        }
+                    };
+                    (width, Some(res))
+                };
+                self.inner.consume(w);
+                res
             }
         }
-        let ada = Adapter {
-            iter: rdr.chars(),
+        let mut ada = Chars {
+            inner: rdr,
             err: None,
         };
-        let mut builder = Builder::new(ada);
-        builder.build()
+        let res = {
+            let mut builder = Builder::new(&mut ada);
+            builder.build()
+        };
+        if let Some(err) = ada.err {
+            Err(err)
+        } else {
+            res
+        }
     }
 
     /// Decodes a json value from a string
@@ -3935,8 +3961,8 @@ mod tests {
         use std::fs::File;
         use std::io::BufReader;
         b.iter( || {
-        	let f = File::open("src/big_file.json").unwrap();
-        	let mut buf = BufReader::new(f);
+            let f = File::open("src/big_file.json").unwrap();
+            let mut buf = BufReader::new(f);
             let _ = Json::from_reader(&mut buf);
         });
     }
