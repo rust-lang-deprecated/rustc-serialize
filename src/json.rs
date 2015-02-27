@@ -316,7 +316,8 @@ pub enum DecoderError {
     ExpectedError(string::String, string::String),
     MissingFieldError(string::String),
     UnknownVariantError(string::String),
-    ApplicationError(string::String)
+    ApplicationError(string::String),
+    EOF,
 }
 
 #[derive(Copy, Debug)]
@@ -1995,21 +1996,21 @@ impl Decoder {
 }
 
 impl Decoder {
-    fn pop(&mut self) -> Json {
-        self.stack.pop().unwrap()
+    fn pop(&mut self) -> DecodeResult<Json> {
+        self.stack.pop().ok_or(EOF)
     }
 }
 
 macro_rules! expect {
     ($e:expr, Null) => ({
-        match $e {
+        match try!($e) {
             Json::Null => Ok(()),
             other => Err(ExpectedError("Null".to_string(),
                                        format!("{}", other)))
         }
     });
     ($e:expr, $t:ident) => ({
-        match $e {
+        match try!($e) {
             Json::$t(v) => Ok(v),
             other => {
                 Err(ExpectedError(stringify!($t).to_string(),
@@ -2022,7 +2023,7 @@ macro_rules! expect {
 macro_rules! read_primitive {
     ($name:ident, $ty:ty) => {
         fn $name(&mut self) -> DecodeResult<$ty> {
-            match self.pop() {
+            match try!(self.pop()) {
                 Json::I64(f) => match num::cast(f) {
                     Some(f) => Ok(f),
                     None => Err(ExpectedError("Number".to_string(), format!("{}", f))),
@@ -2065,7 +2066,7 @@ impl ::Decoder for Decoder {
     fn read_f32(&mut self) -> DecodeResult<f32> { self.read_f64().map(|x| x as f32) }
 
     fn read_f64(&mut self) -> DecodeResult<f64> {
-        match self.pop() {
+        match try!(self.pop()) {
             Json::I64(f) => Ok(f as f64),
             Json::U64(f) => Ok(f as f64),
             Json::F64(f) => Ok(f),
@@ -2113,7 +2114,7 @@ impl ::Decoder for Decoder {
                                mut f: F) -> DecodeResult<T>
         where F: FnMut(&mut Decoder, usize) -> DecodeResult<T>,
     {
-        let name = match self.pop() {
+        let name = match try!(self.pop()) {
             Json::String(s) => s,
             Json::Object(mut o) => {
                 let n = match o.remove(&"variant".to_string()) {
@@ -2178,7 +2179,7 @@ impl ::Decoder for Decoder {
         F: FnOnce(&mut Decoder) -> DecodeResult<T>,
     {
         let value = try!(f(self));
-        self.pop();
+        try!(self.pop());
         Ok(value)
     }
 
@@ -2250,7 +2251,7 @@ impl ::Decoder for Decoder {
     fn read_option<T, F>(&mut self, mut f: F) -> DecodeResult<T> where
         F: FnMut(&mut Decoder, bool) -> DecodeResult<T>,
     {
-        match self.pop() {
+        match try!(self.pop()) {
             Json::Null => f(self, false),
             value => { self.stack.push(value); f(self, true) }
         }
@@ -3845,6 +3846,18 @@ mod tests {
             EncoderError::BadHashmapKey => (),
             _ => panic!("expected bad hash map key")
         }
+    }
+
+    #[test]
+    fn test_bad_json_stack_depleted() {
+        use json;
+        #[derive(Debug, RustcDecodable)]
+        enum ChatEvent {
+            Variant(i32)
+        }
+        let serialized = "{\"variant\": \"Variant\", \"fields\": []}";
+        let r: Result<ChatEvent, _> = json::decode(serialized);
+        assert!(r.unwrap_err() == EOF);
     }
 
     #[bench]
