@@ -3848,6 +3848,18 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_bad_json_stack_depleted() {
+        use json;
+        #[derive(Debug, RustcDecodable)]
+        enum ChatEvent {
+            Variant(i32)
+        }
+        let serialized = "{\"variant\": \"Variant\", \"fields\": []}";
+        let r: Result<ChatEvent, _> = json::decode(serialized);
+        assert!(r.unwrap_err() == EOF);
+    }
+
     #[bench]
     fn bench_streaming_small(b: &mut Bencher) {
         b.iter( || {
