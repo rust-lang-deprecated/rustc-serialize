@@ -16,7 +16,6 @@ Core encoding and decoding interfaces.
 
 use std::cell::{Cell, RefCell};
 use std::ffi::{AsOsStr, OsString};
-use std::old_path::{PosixPath, WindowsPath};
 use std::path;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -539,32 +538,6 @@ macro_rules! tuple {
 }
 
 tuple! { T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, }
-
-impl Encodable for PosixPath {
-    fn encode<S: Encoder>(&self, e: &mut S) -> Result<(), S::Error> {
-        self.as_vec().encode(e)
-    }
-}
-
-impl Decodable for PosixPath {
-    fn decode<D: Decoder>(d: &mut D) -> Result<PosixPath, D::Error> {
-        let bytes: Vec<u8> = try!(Decodable::decode(d));
-        Ok(PosixPath::new(bytes))
-    }
-}
-
-impl Encodable for WindowsPath {
-    fn encode<S: Encoder>(&self, e: &mut S) -> Result<(), S::Error> {
-        self.as_vec().encode(e)
-    }
-}
-
-impl Decodable for WindowsPath {
-    fn decode<D: Decoder>(d: &mut D) -> Result<WindowsPath, D::Error> {
-        let bytes: Vec<u8> = try!(Decodable::decode(d));
-        Ok(WindowsPath::new(bytes))
-    }
-}
 
 impl Encodable for path::Path {
     #[cfg(unix)]
