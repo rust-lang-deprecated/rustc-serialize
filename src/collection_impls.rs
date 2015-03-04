@@ -13,7 +13,7 @@
 use std::hash::Hash;
 
 use {Decodable, Encodable, Decoder, Encoder};
-use std::collections::{LinkedList, VecDeque, BTreeMap, BTreeSet, HashMap, HashSet, VecMap};
+use std::collections::{LinkedList, VecDeque, BTreeMap, BTreeSet, HashMap, HashSet};
 
 impl<
     T: Encodable
@@ -181,31 +181,6 @@ impl<T> Decodable for HashSet<T> where T: Decodable + Hash + Eq, {
                 set.insert(try!(d.read_seq_elt(i, |d| Decodable::decode(d))));
             }
             Ok(set)
-        })
-    }
-}
-impl<V: Encodable> Encodable for VecMap<V> {
-    fn encode<S: Encoder>(&self, e: &mut S) -> Result<(), S::Error> {
-        e.emit_map(self.len(), |e| {
-                for (i, (key, val)) in self.iter().enumerate() {
-                    try!(e.emit_map_elt_key(i, |e| key.encode(e)));
-                    try!(e.emit_map_elt_val(i, |e| val.encode(e)));
-                }
-                Ok(())
-            })
-    }
-}
-
-impl<V: Decodable> Decodable for VecMap<V> {
-    fn decode<D: Decoder>(d: &mut D) -> Result<VecMap<V>, D::Error> {
-        d.read_map(|d, len| {
-            let mut map = VecMap::new();
-            for i in 0..len {
-                let key = try!(d.read_map_elt_key(i, |d| Decodable::decode(d)));
-                let val = try!(d.read_map_elt_val(i, |d| Decodable::decode(d)));
-                map.insert(key, val);
-            }
-            Ok(map)
         })
     }
 }
