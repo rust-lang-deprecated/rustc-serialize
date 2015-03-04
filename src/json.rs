@@ -1481,7 +1481,6 @@ impl<T: Iterator<Item = char>> Parser<T> {
 
     fn parse_u64(&mut self) -> Result<u64, ParserError> {
         let mut accum = 0;
-        let mut last_accum = 0; // necessary to detect overflow.
 
         match self.ch_or_null() {
             '0' => {
@@ -1497,12 +1496,16 @@ impl<T: Iterator<Item = char>> Parser<T> {
                 while !self.eof() {
                     match self.ch_or_null() {
                         c @ '0' ... '9' => {
-                            accum *= 10;
-                            accum += (c as u64) - ('0' as u64);
-
-                            // Detect overflow by comparing to the last value.
-                            if accum <= last_accum { return self.error(InvalidNumber); }
-                            last_accum = accum;
+                            macro_rules! try_or_invalid {
+                                ($e: expr) => {
+                                    match $e {
+                                        Some(v) => v,
+                                        None => return self.error(InvalidNumber)
+                                    }
+                                }
+                            }
+                            accum = try_or_invalid!(accum.checked_mul(10));
+                            accum = try_or_invalid!(accum.checked_add((c as u64) - ('0' as u64)));
 
                             self.bump();
                         }
