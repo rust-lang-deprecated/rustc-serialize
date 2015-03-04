@@ -1481,7 +1481,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
 
     fn parse_u64(&mut self) -> Result<u64, ParserError> {
         let mut accum = 0;
-        let last_accum = 0; // necessary to detect overflow.
+        let mut last_accum = 0; // necessary to detect overflow.
 
         match self.ch_or_null() {
             '0' => {
@@ -1502,6 +1502,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
 
                             // Detect overflow by comparing to the last value.
                             if accum <= last_accum { return self.error(InvalidNumber); }
+                            last_accum = accum;
 
                             self.bump();
                         }
@@ -2870,6 +2871,7 @@ mod tests {
         assert_eq!(Json::from_str("1e+"), Err(SyntaxError(InvalidNumber, 1, 4)));
 
         assert_eq!(Json::from_str("18446744073709551616"), Err(SyntaxError(InvalidNumber, 1, 20)));
+        assert_eq!(Json::from_str("18446744073709551617"), Err(SyntaxError(InvalidNumber, 1, 20)));
         assert_eq!(Json::from_str("-9223372036854775809"), Err(SyntaxError(InvalidNumber, 1, 21)));
 
         assert_eq!(Json::from_str("3"), Ok(U64(3)));
