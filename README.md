@@ -13,7 +13,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rustc-serialize = "0.2"
+rustc-serialize = "0.3"
 ```
 
 and this to your crate root:
