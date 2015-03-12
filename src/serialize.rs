@@ -19,6 +19,7 @@ use std::ffi::{AsOsStr, OsString};
 use std::path;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::marker::PhantomData;
 
 pub trait Encoder {
     type Error;
@@ -483,6 +484,18 @@ impl<T:Decodable> Decodable for Option<T> {
                 Ok(None)
             }
         })
+    }
+}
+
+impl<T> Encodable for PhantomData<T> {
+    fn encode<S: Encoder>(&self, _s: &mut S) -> Result<(), S::Error> {
+        Ok(())
+    }
+}
+
+impl<T> Decodable for PhantomData<T> {
+    fn decode<D: Decoder>(_d: &mut D) -> Result<PhantomData<T>, D::Error> {
+        Ok(PhantomData)
     }
 }
 
