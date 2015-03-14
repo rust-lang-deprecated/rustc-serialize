@@ -923,7 +923,7 @@ impl Json {
         let contents = {
             let mut c = Vec::new();
             match rdr.read_to_end(&mut c) {
-                Ok(c)  => c,
+                Ok(_)  => (),
                 Err(e) => return Err(io_error_to_error(e))
             }
             c
