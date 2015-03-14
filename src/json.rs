@@ -245,6 +245,7 @@ use self::InternalStackElement::*;
 
 use std::collections::{HashMap, BTreeMap};
 use std::error::Error as StdError;
+use std::io::prelude::*;
 use std::mem::swap;
 use std::num::{Float, Int};
 use std::ops::Index;
@@ -252,8 +253,6 @@ use std::str::FromStr;
 use std::string;
 use std::{char, f64, fmt, io, num, str};
 use std;
-use unicode::str as unicode_str;
-use unicode::str::Utf16Item;
 
 use Encodable;
 
@@ -487,8 +486,8 @@ fn escape_str(wr: &mut fmt::Write, v: &str) -> EncodeResult<()> {
 
 fn escape_char(writer: &mut fmt::Write, v: char) -> EncodeResult<()> {
     let mut buf = [0; 4];
-    let n = v.encode_utf8(&mut buf).unwrap();
-    let buf = unsafe { str::from_utf8_unchecked(&buf[..n]) };
+    let _ = write!(&mut &mut buf[..], "{}", v);
+    let buf = unsafe { str::from_utf8_unchecked(&buf[..v.len_utf8()]) };
     escape_str(writer, buf)
 }
 
@@ -1643,11 +1642,13 @@ impl<T: Iterator<Item = char>> Parser<T> {
                                 _ => return self.error(UnexpectedEndOfHexEscape),
                             }
 
-                            let buf = [n1, try!(self.decode_hex_escape())];
-                            match unicode_str::utf16_items(&buf).next() {
-                                Some(Utf16Item::ScalarValue(c)) => res.push(c),
-                                _ => return self.error(LoneLeadingSurrogateInHexEscape),
+                            let n2 = try!(self.decode_hex_escape());
+                            if n2 < 0xDC00 || n2 > 0xDFFF {
+                                return self.error(LoneLeadingSurrogateInHexEscape)
                             }
+                            let c = (((n1 - 0xD800) as u32) << 10 |
+                                     (n2 - 0xDC00) as u32) + 0x1_0000;
+                            res.push(char::from_u32(c).unwrap());
                         }
 
                         n => match char::from_u32(n as u32) {
@@ -3369,14 +3370,11 @@ mod tests {
 
     #[test]
     fn test_encode_hashmap_with_numeric_key() {
-        use std::str::from_utf8;
         use std::collections::HashMap;
         let mut hm: HashMap<usize, bool> = HashMap::new();
         hm.insert(1, true);
-        let mut mem_buf = Vec::new();
-        write!(&mut mem_buf, "{}", super::as_pretty_json(&hm)).unwrap();
-        let json_str = from_utf8(&mem_buf).unwrap();
-        match Json::from_str(json_str) {
+        let json_str = super::as_pretty_json(&hm).to_string();
+        match Json::from_str(&json_str) {
             Err(_) => panic!("Unable to parse json_str: {}", json_str),
             _ => {} // it parsed and we are good to go
         }
@@ -3384,14 +3382,11 @@ mod tests {
 
     #[test]
     fn test_prettyencode_hashmap_with_numeric_key() {
-        use std::str::from_utf8;
         use std::collections::HashMap;
         let mut hm: HashMap<usize, bool> = HashMap::new();
         hm.insert(1, true);
-        let mut mem_buf = Vec::new();
-        write!(&mut mem_buf, "{}", super::as_pretty_json(&hm)).unwrap();
-        let json_str = from_utf8(&mem_buf).unwrap();
-        match Json::from_str(json_str) {
+        let json_str = super::as_pretty_json(&hm).to_string();
+        match Json::from_str(&json_str) {
             Err(_) => panic!("Unable to parse json_str: {}", json_str),
             _ => {} // it parsed and we are good to go
         }
@@ -3399,7 +3394,6 @@ mod tests {
 
     #[test]
     fn test_prettyencoder_indent_level_param() {
-        use std::str::from_utf8;
         use std::collections::BTreeMap;
 
         let mut tree = BTreeMap::new();
@@ -3426,11 +3420,8 @@ mod tests {
 
         // Test up to 4 spaces of indents (more?)
         for i in 0..4 {
-            let mut writer = Vec::new();
-            write!(&mut writer, "{}",
-                   super::as_pretty_json(&json).indent(i as u32)).unwrap();
-
-            let printed = from_utf8(&writer).unwrap();
+            let printed = super::as_pretty_json(&json).indent(i as u32)
+                                .to_string();
 
             // Check for indents at each line
             let lines: Vec<&str> = printed.lines().collect();
@@ -3445,7 +3436,8 @@ mod tests {
             assert_eq!(indents(lines[6]), 0 * i); // ]
 
             // Finally, test that the pretty-printed JSON is valid
-            Json::from_str(printed).ok().expect("Pretty-printed JSON is invalid!");
+            Json::from_str(&printed).ok()
+                 .expect("Pretty-printed JSON is invalid!");
         }
     }
 
@@ -3601,7 +3593,8 @@ mod tests {
                 "b": [
                     true,
                     "foo\nbar",
-                    { "c": {"d": null} }
+                    { "c": {"d": null} },
+                    "\uD834\uDF06"
                 ]
             }"#,
             vec![
@@ -3615,6 +3608,7 @@ mod tests {
                         (NullValue,             vec![Key("b"), Index(2), Key("c"), Key("d")]),
                       (ObjectEnd,               vec![Key("b"), Index(2), Key("c")]),
                     (ObjectEnd,                 vec![Key("b"), Index(2)]),
+                    (StringValue("\u{1D306}".to_string()),  vec![Key("b"), Index(3)]),
                   (ArrayEnd,                    vec![Key("b")]),
                 (ObjectEnd,                     vec![]),
             ]

@@ -10,7 +10,7 @@
 
 //! Support code for encoding and decoding types.
 
-#![feature(core, unicode, io, std_misc, path)]
+#![feature(core, io, std_misc, path)]
 #![doc(html_logo_url = "http://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
        html_favicon_url = "http://www.rust-lang.org/favicon.ico",
        html_root_url = "http://doc.rust-lang.org/rustc-serialize/")]
@@ -19,8 +19,6 @@
 
 #[cfg(test)] extern crate test;
 #[cfg(test)] extern crate rand;
-
-extern crate unicode;
 
 pub use self::serialize::{Decoder, Encoder, Decodable, Encodable,
                           DecoderHelpers, EncoderHelpers};
