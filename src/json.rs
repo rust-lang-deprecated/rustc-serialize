@@ -304,6 +304,11 @@ pub enum ParserError {
     /// msg, line, col
     SyntaxError(ErrorCode, usize, usize),
     IoError(io::Error),
+    CharError,
+}
+
+impl std::error::FromError<io::Error> for ParserError {
+    fn from_error(err: io::Error) -> ParserError { ParserError::IoError(err) }
 }
 
 // Builder and Parser have the same errors.
@@ -373,10 +378,6 @@ impl fmt::Debug for ErrorCode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         error_str(*self).fmt(f)
     }
-}
-
-fn io_error_to_error(err: io::Error) -> ParserError {
-    IoError(err)
 }
 
 impl StdError for DecoderError {
@@ -919,21 +920,56 @@ pub fn as_pretty_json<T: Encodable>(t: &T) -> AsPrettyJson<T> {
 
 impl Json {
     /// Decodes a json value from an `&mut io::Read`
-    pub fn from_reader(rdr: &mut io::Read) -> Result<Self, BuilderError> {
-        let contents = {
-            let mut c = Vec::new();
-            match rdr.read_to_end(&mut c) {
-                Ok(c)  => c,
-                Err(e) => return Err(io_error_to_error(e))
+    pub fn from_reader(rdr: &mut io::BufRead) -> Result<Self, BuilderError> {
+
+        use std::io::BufRead;
+        struct Chars<R: BufRead> {
+            inner: R,
+            err: Option<BuilderError>,
+        }
+
+        impl<R: BufRead> Iterator for Chars<R> {
+            type Item = char;
+        
+        	#[inline]
+            fn next(&mut self) -> Option<char> {
+                use unicode::str::utf8_char_width;
+                let (w, res) = {
+                    let buf = match self.inner.fill_buf() {
+                        Ok([]) => return None,
+                        Ok(buf) => buf,
+                        Err(err) => {
+                            self.err = Some(IoError(err));
+                            return None;
+                        },
+                    };
+                    let width = utf8_char_width(buf[0]);
+                    let res = match str::from_utf8(&buf[..width]).ok() {
+                        Some(s) => s.char_at(0),
+                        None => {
+                            self.err = Some(CharError);
+                            return None;
+                        }
+                    };
+                    (width, Some(res))
+                };
+                self.inner.consume(w);
+                res
             }
-            c
+        }
+        let mut ada = Chars {
+            inner: rdr,
+            err: None,
         };
-        let s = match str::from_utf8(&contents).ok() {
-            Some(s) => s,
-            _       => return Err(SyntaxError(NotUtf8, 0, 0))
+        let res = {
+            let mut builder = Builder::new(&mut ada);
+            builder.build()
         };
-        let mut builder = Builder::new(s.chars());
-        builder.build()
+        if let Some(err) = ada.err {
+            Err(err)
+        } else {
+            res
+        }
     }
 
     /// Decodes a json value from a string
@@ -3921,5 +3957,25 @@ mod tests {
     fn bench_large(b: &mut Bencher) {
         let src = big_json();
         b.iter( || { let _ = Json::from_str(&src); });
+    }
+
+    #[bench]
+    fn bench_large_file(b: &mut Bencher) {
+        use std::fs::File;
+        use std::io::BufReader;
+        let f = File::open("src/big_file.json").unwrap();
+        let mut buf = BufReader::new(f);
+        b.iter( || { let _ = Json::from_reader(&mut buf); });
+    }
+
+    #[bench]
+    fn bench_large_file_reopening(b: &mut Bencher) {
+        use std::fs::File;
+        use std::io::BufReader;
+        b.iter( || {
+            let f = File::open("src/big_file.json").unwrap();
+            let mut buf = BufReader::new(f);
+            let _ = Json::from_reader(&mut buf);
+        });
     }
 }
