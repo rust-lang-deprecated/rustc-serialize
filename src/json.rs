@@ -1669,13 +1669,9 @@ impl<T: Iterator<Item = char>> Parser<T> {
                         self.bump();
                         return Ok(res);
                     },
-                    Some(c) => {
-                        if c.is_control() {
-                            return self.error(ControlCharacterInString)
-                        } else {
-                            res.push(c)
-                        }
-                    },
+                    Some(c) if c.is_control() =>
+                        return self.error(ControlCharacterInString),
+                    Some(c) => res.push(c),
                     None => unreachable!()
                 }
             }
