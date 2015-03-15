@@ -1587,25 +1587,16 @@ impl<T: Iterator<Item = char>> Parser<T> {
     fn decode_hex_escape(&mut self) -> Result<u16, ParserError> {
         let mut i = 0;
         let mut n = 0;
-        while i < 4 && !self.eof() {
+        while i < 4 {
             self.bump();
             n = match self.ch_or_null() {
                 c @ '0' ... '9' => n * 16 + ((c as u16) - ('0' as u16)),
-                'a' | 'A' => n * 16 + 10,
-                'b' | 'B' => n * 16 + 11,
-                'c' | 'C' => n * 16 + 12,
-                'd' | 'D' => n * 16 + 13,
-                'e' | 'E' => n * 16 + 14,
-                'f' | 'F' => n * 16 + 15,
+                c @ 'a' ... 'f' => n * 16 + (10 + (c as u16) - ('a' as u16)),
+                c @ 'A' ... 'F' => n * 16 + (10 + (c as u16) - ('A' as u16)),
                 _ => return self.error(InvalidEscape)
             };
 
             i += 1;
-        }
-
-        // Error out if we didn't parse 4 digits.
-        if i != 4 {
-            return self.error(InvalidEscape);
         }
 
         Ok(n)
@@ -3896,6 +3887,18 @@ mod tests {
                     { "c": {"d": null} }
                 ]
             }"#);
+        });
+    }
+
+    #[bench]
+    fn bench_decode_hex_escape(b: &mut Bencher) {
+        let mut src = "\"".to_string();
+        for _ in 0..10 {
+            src.push_str("\\uF975\\uf9bc\\uF9A0\\uF9C4\\uF975\\uf9bc\\uF9A0\\uF9C4");
+        }
+        src.push_str("\"");
+        b.iter( || {
+            let _ = Json::from_str(&src);
         });
     }
 
