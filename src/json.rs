@@ -296,6 +296,7 @@ pub enum ErrorCode {
     UnexpectedEndOfHexEscape,
     UnrecognizedHex,
     NotFourDigit,
+    ControlCharacterInString,
     NotUtf8,
 }
 
@@ -341,6 +342,7 @@ pub fn error_str(error: ErrorCode) -> &'static str {
         InvalidEscape => "invalid escape",
         UnrecognizedHex => "invalid \\u{ esc}ape (unrecognized hex)",
         NotFourDigit => "invalid \\u{ esc}ape (not four digits)",
+        ControlCharacterInString => "unescaped control character in string",
         NotUtf8 => "contents not utf-8",
         InvalidUnicodeCodePoint => "invalid Unicode code point",
         LoneLeadingSurrogateInHexEscape => "lone leading surrogate in hex escape",
@@ -1667,7 +1669,13 @@ impl<T: Iterator<Item = char>> Parser<T> {
                         self.bump();
                         return Ok(res);
                     },
-                    Some(c) => res.push(c),
+                    Some(c) => {
+                        if c.is_control() {
+                            return self.error(ControlCharacterInString)
+                        } else {
+                            res.push(c)
+                        }
+                    },
                     None => unreachable!()
                 }
             }
@@ -2933,8 +2941,9 @@ mod tests {
 
     #[test]
     fn test_read_str() {
-        assert_eq!(Json::from_str("\""),    Err(SyntaxError(EOFWhileParsingString, 1, 2)));
-        assert_eq!(Json::from_str("\"lol"), Err(SyntaxError(EOFWhileParsingString, 1, 5)));
+        assert_eq!(Json::from_str("\""),     Err(SyntaxError(EOFWhileParsingString, 1, 2)));
+        assert_eq!(Json::from_str("\"lol"),  Err(SyntaxError(EOFWhileParsingString, 1, 5)));
+        assert_eq!(Json::from_str("\"\n\""), Err(SyntaxError(ControlCharacterInString, 2, 1)));
 
         assert_eq!(Json::from_str("\"\""), Ok(String("".to_string())));
         assert_eq!(Json::from_str("\"foo\""), Ok(String("foo".to_string())));
