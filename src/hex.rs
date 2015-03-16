@@ -32,7 +32,6 @@ impl ToHex for [u8] {
     /// # Example
     ///
     /// ```rust
-    /// # #![allow(unstable)]
     /// extern crate "rustc-serialize" as rustc_serialize;
     /// use rustc_serialize::hex::ToHex;
     ///
@@ -107,7 +106,6 @@ impl FromHex for str {
     /// This converts a string literal to hexadecimal and back.
     ///
     /// ```rust
-    /// # #![allow(unstable)]
     /// extern crate "rustc-serialize" as rustc_serialize;
     /// use rustc_serialize::hex::{FromHex, ToHex};
     ///

@@ -82,7 +82,6 @@ impl ToBase64 for [u8] {
     /// # Example
     ///
     /// ```rust
-    /// # #![allow(unstable)]
     /// extern crate "rustc-serialize" as rustc_serialize;
     /// use rustc_serialize::base64::{ToBase64, STANDARD};
     ///
@@ -223,7 +222,6 @@ impl FromBase64 for str {
     /// This converts a string literal to base64 and back.
     ///
     /// ```rust
-    /// # #![allow(unstable)]
     /// extern crate "rustc-serialize" as rustc_serialize;
     /// use rustc_serialize::base64::{ToBase64, FromBase64, STANDARD};
     ///

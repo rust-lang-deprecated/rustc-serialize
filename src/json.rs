@@ -11,9 +11,6 @@
 // Rust JSON serialization library
 // Copyright (c) 2011 Google Inc.
 
-#![forbid(non_camel_case_types)]
-#![allow(missing_docs)]
-
 //! JSON parsing and serialization
 //!
 //! # What is JSON?
@@ -86,7 +83,6 @@
 //! from JSON using the serialization API, using the derived serialization code.
 //!
 //! ```rust
-//! # #![allow(unstable)]
 //! extern crate "rustc-serialize" as rustc_serialize;
 //! use rustc_serialize::json;
 //!
@@ -122,7 +118,6 @@
 //! ### Simple example of `ToJson` usage
 //!
 //! ```rust
-//! # #![allow(unstable)]
 //! extern crate "rustc-serialize" as rustc_serialize;
 //! use rustc_serialize::json::{self, ToJson, Json};
 //!
@@ -162,7 +157,6 @@
 //! ### Verbose example of `ToJson` usage
 //!
 //! ```rust
-//! # #![allow(unstable)]
 //! extern crate "rustc-serialize" as rustc_serialize;
 //! use std::collections::BTreeMap;
 //! use rustc_serialize::json::{self, Json, ToJson};
@@ -205,7 +199,6 @@
 //! ## Parsing a `str` to `Json` and reading the result
 //!
 //! ```rust
-//! # #![allow(unstable)]
 //! extern crate "rustc-serialize" as rustc_serialize;
 //! use rustc_serialize::json::Json;
 //!

@@ -513,7 +513,6 @@ macro_rules! tuple {
     () => ();
     ( $($name:ident,)+ ) => (
         impl<$($name:Decodable),*> Decodable for ($($name,)*) {
-            #[allow(non_snake_case)]
             fn decode<D: Decoder>(d: &mut D) -> Result<($($name,)*), D::Error> {
                 let len: usize = count_idents!($($name,)*);
                 d.read_tuple(len, |d| {
