@@ -548,12 +548,12 @@ tuple! { T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, }
 impl Encodable for path::Path {
     #[cfg(unix)]
     fn encode<S: Encoder>(&self, e: &mut S) -> Result<(), S::Error> {
-        use std::os::unix::OsStrExt;
+        use std::os::unix::prelude::*;
         self.as_os_str().as_bytes().encode(e)
     }
     #[cfg(windows)]
     fn encode<S: Encoder>(&self, e: &mut S) -> Result<(), S::Error> {
-        use std::os::windows::OsStrExt;
+        use std::os::windows::prelude::*;
         let v = self.as_os_str().encode_wide().collect::<Vec<_>>();
         v.encode(e)
     }
@@ -568,7 +568,7 @@ impl Encodable for path::PathBuf {
 impl Decodable for path::PathBuf {
     #[cfg(unix)]
     fn decode<D: Decoder>(d: &mut D) -> Result<path::PathBuf, D::Error> {
-        use std::os::unix::OsStringExt;
+        use std::os::unix::prelude::*;
         let bytes: Vec<u8> = try!(Decodable::decode(d));
         let s: OsString = OsStringExt::from_vec(bytes);
         Ok(path::PathBuf::new(&s))
