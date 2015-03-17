@@ -574,7 +574,7 @@ impl Decodable for path::PathBuf {
     }
     #[cfg(windows)]
     fn decode<D: Decoder>(d: &mut D) -> Result<path::PathBuf, D::Error> {
-        use std::os::windows::ffi::OsStringExt;
+        use std::os::windows::prelude::*;
         let bytes: Vec<u16> = try!(Decodable::decode(d));
         let s: OsString = OsStringExt::from_wide(&bytes);
         Ok(path::PathBuf::new(&s))
