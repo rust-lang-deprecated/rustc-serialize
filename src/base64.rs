@@ -105,8 +105,8 @@ impl ToBase64 for [u8] {
         let mod_len = len % 3;
         let cond_len = len - mod_len;
         let newline = match config.newline {
-            Newline::LF => b"\n",
-            Newline::CRLF => b"\r\n"
+            Newline::LF => b"\n".as_slice(),
+            Newline::CRLF => b"\r\n".as_slice()
         };
         while i < cond_len {
             let (first, second, third) = (self[i], self[i + 1], self[i + 2]);
