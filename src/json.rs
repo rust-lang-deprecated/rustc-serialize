@@ -507,8 +507,10 @@ fn fmt_number_or_null(v: f64) -> string::String {
 
     match v.classify() {
         Nan | Infinite => "null".to_string(),
-        _ if v.fract() != 0f64 => f64::to_str_digits(v, 6),
-        _ => f64::to_str_digits(v, 6) + ".0",
+        _ => {
+            let s = v.to_string();
+            if s.contains(".") {s} else {s + ".0"}
+        }
     }
 }
 
