@@ -105,14 +105,14 @@ impl ToBase64 for [u8] {
         let mod_len = len % 3;
         let cond_len = len - mod_len;
         let newline = match config.newline {
-            Newline::LF => b"\n".as_slice(),
-            Newline::CRLF => b"\r\n".as_slice()
+            Newline::LF => "\n",
+            Newline::CRLF => "\r\n",
         };
         while i < cond_len {
             let (first, second, third) = (self[i], self[i + 1], self[i + 2]);
             if let Some(line_length) = config.line_length {
                 if cur_length >= line_length {
-                    v.extend(newline.iter().map(|x| *x));
+                    v.extend(newline.bytes().map(|x| *x));
                     cur_length = 0;
                 }
             }
