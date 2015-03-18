@@ -238,13 +238,14 @@ use self::InternalStackElement::*;
 
 use std::collections::{HashMap, BTreeMap};
 use std::error::Error as StdError;
+use std::i64;
 use std::io::prelude::*;
 use std::mem::swap;
 use std::num::{Float, Int};
 use std::ops::Index;
 use std::str::FromStr;
 use std::string;
-use std::{char, f64, fmt, io, num, str};
+use std::{char, f64, fmt, io, str};
 use std;
 
 use Encodable;
@@ -1086,7 +1087,8 @@ impl Json {
     pub fn as_i64(&self) -> Option<i64> {
         match *self {
             Json::I64(n) => Some(n),
-            Json::U64(n) => num::cast(n),
+            Json::U64(n) if n >= i64::MAX as u64 => None,
+            Json::U64(n) => Some(n as i64),
             _ => None
         }
     }
@@ -1095,7 +1097,7 @@ impl Json {
     /// Returns None otherwise.
     pub fn as_u64(&self) -> Option<u64> {
         match *self {
-            Json::I64(n) => num::cast(n),
+            Json::I64(n) if n >= 0 => Some(n as u64),
             Json::U64(n) => Some(n),
             _ => None
         }
@@ -1105,8 +1107,8 @@ impl Json {
     /// Returns None otherwise.
     pub fn as_f64(&self) -> Option<f64> {
         match *self {
-            Json::I64(n) => num::cast(n),
-            Json::U64(n) => num::cast(n),
+            Json::I64(n) => Some(n as f64),
+            Json::U64(n) => Some(n as f64),
             Json::F64(n) => Some(n),
             _ => None
         }
@@ -2014,25 +2016,38 @@ macro_rules! expect {
 }
 
 macro_rules! read_primitive {
-    ($name:ident, $ty:ty) => {
+    ($name:ident, $ty:ident) => {
+        #[allow(unused_comparisons)]
         fn $name(&mut self) -> DecodeResult<$ty> {
             match try!(self.pop()) {
-                Json::I64(f) => match num::cast(f) {
-                    Some(f) => Ok(f),
-                    None => Err(ExpectedError("Number".to_string(), format!("{}", f))),
-                },
-                Json::U64(f) => match num::cast(f) {
-                    Some(f) => Ok(f),
-                    None => Err(ExpectedError("Number".to_string(), format!("{}", f))),
-                },
-                Json::F64(f) => Err(ExpectedError("Integer".to_string(), format!("{}", f))),
+                Json::I64(i) => {
+                    let other = i as $ty;
+                    if i == other as i64 && (other > 0) == (i > 0) {
+                        Ok(other)
+                    } else {
+                        Err(ExpectedError("Number".to_string(), i.to_string()))
+                    }
+                }
+                Json::U64(u) => {
+                    let other = u as $ty;
+                    if u == other as u64 && other >= 0 {
+                        Ok(other)
+                    } else {
+                        Err(ExpectedError("Number".to_string(), u.to_string()))
+                    }
+                }
+                Json::F64(f) => {
+                    Err(ExpectedError("Integer".to_string(), f.to_string()))
+                }
                 // re: #12967.. a type w/ numeric keys (ie HashMap<usize, V> etc)
                 // is going to have a string here, as per JSON spec.
                 Json::String(s) => match s.parse() {
                     Ok(f)  => Ok(f),
                     Err(_) => Err(ExpectedError("Number".to_string(), s)),
                 },
-                value => Err(ExpectedError("Number".to_string(), format!("{}", value))),
+                value => {
+                    Err(ExpectedError("Number".to_string(), value.to_string()))
+                }
             }
         }
     }
@@ -2056,7 +2071,9 @@ impl ::Decoder for Decoder {
     read_primitive! { read_i32, i32 }
     read_primitive! { read_i64, i64 }
 
-    fn read_f32(&mut self) -> DecodeResult<f32> { self.read_f64().map(|x| x as f32) }
+    fn read_f32(&mut self) -> DecodeResult<f32> {
+        self.read_f64().map(|x| x as f32)
+    }
 
     fn read_f64(&mut self) -> DecodeResult<f64> {
         match try!(self.pop()) {
