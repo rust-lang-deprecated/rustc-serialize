@@ -112,7 +112,7 @@ impl ToBase64 for [u8] {
             let (first, second, third) = (self[i], self[i + 1], self[i + 2]);
             if let Some(line_length) = config.line_length {
                 if cur_length >= line_length {
-                    v.extend(newline.bytes().map(|x| *x));
+                    v.extend(newline.bytes());
                     cur_length = 0;
                 }
             }
@@ -134,7 +134,7 @@ impl ToBase64 for [u8] {
         if mod_len != 0 {
             if let Some(line_length) = config.line_length {
                 if cur_length >= line_length {
-                    v.extend(newline.iter().map(|x| *x));
+                    v.extend(newline.bytes());
                 }
             }
         }
