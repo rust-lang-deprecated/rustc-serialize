@@ -1994,7 +1994,10 @@ impl Decoder {
 
 impl Decoder {
     fn pop(&mut self) -> DecodeResult<Json> {
-        self.stack.pop().ok_or(EOF)
+        match self.stack.pop() {
+            Some(s) => Ok(s),
+            None => Err(EOF),
+        }
     }
 }
 
