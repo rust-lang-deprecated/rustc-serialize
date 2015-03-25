@@ -83,7 +83,7 @@
 //! from JSON using the serialization API, using the derived serialization code.
 //!
 //! ```rust
-//! extern crate "rustc-serialize" as rustc_serialize;
+//! extern crate rustc_serialize;
 //! use rustc_serialize::json;
 //!
 //! // Automatically generate `RustcDecodable` and `RustcEncodable` trait
@@ -118,7 +118,7 @@
 //! ### Simple example of `ToJson` usage
 //!
 //! ```rust
-//! extern crate "rustc-serialize" as rustc_serialize;
+//! extern crate rustc_serialize;
 //! use rustc_serialize::json::{self, ToJson, Json};
 //!
 //! // A custom data structure
@@ -157,7 +157,7 @@
 //! ### Verbose example of `ToJson` usage
 //!
 //! ```rust
-//! extern crate "rustc-serialize" as rustc_serialize;
+//! extern crate rustc_serialize;
 //! use std::collections::BTreeMap;
 //! use rustc_serialize::json::{self, Json, ToJson};
 //!
@@ -199,7 +199,7 @@
 //! ## Parsing a `str` to `Json` and reading the result
 //!
 //! ```rust
-//! extern crate "rustc-serialize" as rustc_serialize;
+//! extern crate rustc_serialize;
 //! use rustc_serialize::json::Json;
 //!
 //! fn main() {
