@@ -1148,17 +1148,17 @@ impl Json {
 impl<'a> Index<&'a str>  for Json {
     type Output = Json;
 
-    fn index(&self, idx: & &str) -> &Json {
-        self.find(*idx).unwrap()
+    fn index(&self, idx: &str) -> &Json {
+        self.find(idx).unwrap()
     }
 }
 
 impl Index<usize> for Json {
     type Output = Json;
 
-    fn index<'a>(&'a self, idx: &usize) -> &'a Json {
+    fn index<'a>(&'a self, idx: usize) -> &'a Json {
         match self {
-            &Json::Array(ref v) => &v[*idx],
+            &Json::Array(ref v) => &v[idx],
             _ => panic!("can only index Json with usize if it is an array")
         }
     }
