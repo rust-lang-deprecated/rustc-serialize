@@ -379,7 +379,7 @@ impl StdError for DecoderError {
     fn description(&self) -> &str { "decoder error" }
     fn cause(&self) -> Option<&StdError> {
         match *self {
-            DecoderError::ParseError(ref e) => Some(e as &StdError),
+            DecoderError::ParseError(ref e) => Some(e),
             _ => None,
         }
     }
@@ -3844,13 +3844,12 @@ mod tests {
     #[test]
     fn test_encode_hashmap_with_arbitrary_key() {
         use std::collections::HashMap;
-        use std::fmt;
         #[derive(PartialEq, Eq, Hash, RustcEncodable)]
         struct ArbitraryType(u32);
         let mut hm: HashMap<ArbitraryType, bool> = HashMap::new();
         hm.insert(ArbitraryType(1), true);
         let mut mem_buf = string::String::new();
-        let mut encoder = Encoder::new(&mut mem_buf as &mut fmt::Write);
+        let mut encoder = Encoder::new(&mut mem_buf);
         let result = hm.encode(&mut encoder);
         match result.err().unwrap() {
             EncoderError::BadHashmapKey => (),
