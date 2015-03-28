@@ -19,5 +19,5 @@ rustc-serialize = "0.3"
 and this to your crate root:
 
 ```rust
-extern crate "rustc-serialize" as rustc_serialize;
+extern crate rustc_serialize;
 ```
