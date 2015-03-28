@@ -15,4 +15,4 @@ support for hex, base64, and json encoding and decoding.
 """
 
 [dev-dependencies]
-rand = "0.2"
+rand = "0.3"
