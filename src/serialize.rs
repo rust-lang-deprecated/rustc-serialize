@@ -579,7 +579,7 @@ impl Decodable for path::PathBuf {
         use std::os::windows::prelude::*;
         let bytes: Vec<u16> = try!(Decodable::decode(d));
         let s: OsString = OsStringExt::from_wide(&bytes);
-        let mut p = PathBuf::new();
+        let mut p = path::PathBuf::new();
         p.push(s);
         Ok(p)
     }
