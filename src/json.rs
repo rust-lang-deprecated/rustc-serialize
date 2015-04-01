@@ -2545,7 +2545,6 @@ mod tests {
                 StackElement, Stack, Decoder, Encoder, EncoderError};
     use std::{i64, u64, f32, f64};
     use std::collections::BTreeMap;
-    use std::num::Float;
     use std::string;
 
     #[derive(RustcDecodable, Eq, PartialEq, Debug)]
