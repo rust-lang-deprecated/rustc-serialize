@@ -243,10 +243,10 @@ use std::io::prelude::*;
 use std::mem::swap;
 use std::num::{Float, Int};
 use std::ops::Index;
+use std::rc::Rc;
 use std::str::FromStr;
 use std::string;
 use std::{char, f64, fmt, io, str};
-use std;
 
 use Encodable;
 
@@ -294,11 +294,22 @@ pub enum ErrorCode {
     NotUtf8,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Debug)]
 pub enum ParserError {
     /// msg, line, col
     SyntaxError(ErrorCode, usize, usize),
-    IoError(io::Error),
+    IoError(Rc<io::Error>),
+}
+
+impl PartialEq for ParserError {
+    fn eq(&self, other: &ParserError) -> bool {
+        match (self, other) {
+            (&SyntaxError(msg0, line0, col0), &SyntaxError(msg1, line1, col1)) =>
+                msg0 == msg1 && line0 == line1 && col0 == col1,
+            (&IoError(_), _) => false,
+            (_, &IoError(_)) => false,
+        }
+    }
 }
 
 // Builder and Parser have the same errors.
@@ -372,7 +383,7 @@ impl fmt::Debug for ErrorCode {
 }
 
 fn io_error_to_error(err: io::Error) -> ParserError {
-    IoError(err)
+    IoError(Rc::new(err))
 }
 
 impl StdError for DecoderError {
@@ -411,8 +422,8 @@ impl fmt::Display for EncoderError {
     }
 }
 
-impl std::error::FromError<fmt::Error> for EncoderError {
-    fn from_error(err: fmt::Error) -> EncoderError { EncoderError::FmtError(err) }
+impl From<fmt::Error> for EncoderError {
+    fn from(err: fmt::Error) -> EncoderError { EncoderError::FmtError(err) }
 }
 
 pub type EncodeResult<T> = Result<T, EncoderError>;
