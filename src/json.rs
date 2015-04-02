@@ -247,7 +247,6 @@ use std::rc::Rc;
 use std::str::FromStr;
 use std::string;
 use std::{char, f64, fmt, io, str};
-use std;
 
 use Encodable;
 
