@@ -411,8 +411,8 @@ impl fmt::Display for EncoderError {
     }
 }
 
-impl std::error::FromError<fmt::Error> for EncoderError {
-    fn from_error(err: fmt::Error) -> EncoderError { EncoderError::FmtError(err) }
+impl From<fmt::Error> for EncoderError {
+    fn from(err: fmt::Error) -> EncoderError { EncoderError::FmtError(err) }
 }
 
 pub type EncodeResult<T> = Result<T, EncoderError>;
