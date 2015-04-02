@@ -243,7 +243,6 @@ use std::io::prelude::*;
 use std::mem::swap;
 use std::num::{Float, Int};
 use std::ops::Index;
-use std::rc::Rc;
 use std::str::FromStr;
 use std::string;
 use std::{char, f64, fmt, io, str};
@@ -294,11 +293,11 @@ pub enum ErrorCode {
     NotUtf8,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum ParserError {
     /// msg, line, col
     SyntaxError(ErrorCode, usize, usize),
-    IoError(Rc<io::Error>),
+    IoError(io::Error),
 }
 
 impl PartialEq for ParserError {
@@ -315,7 +314,7 @@ impl PartialEq for ParserError {
 // Builder and Parser have the same errors.
 pub type BuilderError = ParserError;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(PartialEq, Debug)]
 pub enum DecoderError {
     ParseError(ParserError),
     ExpectedError(string::String, string::String),
@@ -383,7 +382,7 @@ impl fmt::Debug for ErrorCode {
 }
 
 fn io_error_to_error(err: io::Error) -> ParserError {
-    IoError(Rc::new(err))
+    IoError(err)
 }
 
 impl StdError for DecoderError {
@@ -1176,7 +1175,7 @@ impl Index<usize> for Json {
 }
 
 /// The output of the streaming parser.
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Debug)]
 pub enum JsonEvent {
     ObjectStart,
     ObjectEnd,
@@ -1916,10 +1915,10 @@ impl<T: Iterator<Item = char>> Builder<T> {
         self.bump();
         let result = self.build_value();
         self.bump();
-        match self.token {
+        match self.token.take() {
             None => {}
-            Some(Error(ref e)) => { return Err(e.clone()); }
-            ref tok => { panic!("unexpected token {:?}", tok.clone()); }
+            Some(Error(e)) => { return Err(e); }
+            ref tok => { panic!("unexpected token {:?}", tok); }
         }
         result
     }
@@ -1929,7 +1928,7 @@ impl<T: Iterator<Item = char>> Builder<T> {
     }
 
     fn build_value(&mut self) -> Result<Json, BuilderError> {
-        return match self.token {
+        return match self.token.take() {
             Some(NullValue) => Ok(Json::Null),
             Some(I64Value(n)) => Ok(Json::I64(n)),
             Some(U64Value(n)) => Ok(Json::U64(n)),
@@ -1940,7 +1939,7 @@ impl<T: Iterator<Item = char>> Builder<T> {
                 swap(s, &mut temp);
                 Ok(Json::String(temp))
             }
-            Some(Error(ref e)) => Err(e.clone()),
+            Some(Error(e)) => Err(e),
             Some(ArrayStart) => self.build_array(),
             Some(ObjectStart) => self.build_object(),
             Some(ObjectEnd) => self.parser.error(InvalidSyntax),
@@ -1954,7 +1953,7 @@ impl<T: Iterator<Item = char>> Builder<T> {
         let mut values = Vec::new();
 
         loop {
-            if self.token == Some(ArrayEnd) {
+            if let Some(ArrayEnd) = self.token {
                 return Ok(Json::Array(values.into_iter().collect()));
             }
             match self.build_value() {
@@ -1971,11 +1970,11 @@ impl<T: Iterator<Item = char>> Builder<T> {
         let mut values = BTreeMap::new();
 
         loop {
-            match self.token {
+            match self.token.take() {
                 Some(ObjectEnd) => { return Ok(Json::Object(values)); }
-                Some(Error(ref e)) => { return Err(e.clone()); }
+                Some(Error(e)) => { return Err(e); }
                 None => { break; }
-                _ => {}
+                token => { self.token = token; }
             }
             let key = match self.parser.stack().top() {
                 Some(StackElement::Key(k)) => { k.to_string() }
@@ -2948,7 +2947,8 @@ mod tests {
         assert_eq!(v, i64::MAX);
 
         let res: DecodeResult<i64> = super::decode("765.25252");
-        assert_eq!(res, Err(ExpectedError("Integer".to_string(), "765.25252".to_string())));
+        assert_eq!(res, Err(ExpectedError("Integer".to_string(),
+                                          "765.25252".to_string())));
     }
 
     #[test]
