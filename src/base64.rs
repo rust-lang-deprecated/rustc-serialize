@@ -19,7 +19,7 @@ use std::fmt;
 use std::error;
 
 /// Available encoding character sets
-#[derive(Copy)]
+#[derive(Clone, Copy)]
 pub enum CharacterSet {
     /// The standard character set (uses `+` and `/`)
     Standard,
@@ -28,7 +28,7 @@ pub enum CharacterSet {
 }
 
 /// Available newline types
-#[derive(Copy)]
+#[derive(Clone, Copy)]
 pub enum Newline {
     /// A linefeed (i.e. Unix-style newline)
     LF,
@@ -37,7 +37,7 @@ pub enum Newline {
 }
 
 /// Contains configuration parameters for `to_base64`.
-#[derive(Copy)]
+#[derive(Clone, Copy)]
 pub struct Config {
     /// Character set to use
     pub char_set: CharacterSet,
@@ -177,7 +177,7 @@ pub trait FromBase64 {
 }
 
 /// Errors that can occur when decoding a base64 encoded string
-#[derive(Copy)]
+#[derive(Clone, Copy)]
 pub enum FromBase64Error {
     /// The input contained a character not part of the base64 format
     InvalidBase64Byte(u8, usize),

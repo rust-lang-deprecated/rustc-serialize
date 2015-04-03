@@ -330,6 +330,10 @@ pub enum EncoderError {
     BadHashmapKey,
 }
 
+impl Clone for EncoderError {
+    fn clone(&self) -> Self { *self }
+}
+
 /// Returns a readable error string for a given error code.
 pub fn error_str(error: ErrorCode) -> &'static str {
     match error {
