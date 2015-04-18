@@ -1477,13 +1477,12 @@ impl<T: Iterator<Item = char>> Parser<T> {
             F64Value(res)
         } else {
             if neg {
-                let res = -(res as i64);
-
-                // Make sure we didn't underflow.
-                if res > 0 {
+                // Make sure we don't underflow.
+                if res > (i64::MAX as u64) + 1 {
                     Error(SyntaxError(InvalidNumber, self.line, self.col))
                 } else {
-                    I64Value(res)
+                    println!("{:x} {:x}", res, !res);
+                    I64Value((!res + 1) as i64)
                 }
             } else {
                 U64Value(res)
