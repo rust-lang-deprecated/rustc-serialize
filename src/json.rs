@@ -241,7 +241,6 @@ use std::error::Error as StdError;
 use std::i64;
 use std::io::prelude::*;
 use std::mem::swap;
-use std::num::{Float, Int};
 use std::ops::Index;
 use std::str::FromStr;
 use std::string;
@@ -1491,7 +1490,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
     }
 
     fn parse_u64(&mut self) -> Result<u64, ParserError> {
-        let mut accum = 0;
+        let mut accum: u64 = 0;
 
         match self.ch_or_null() {
             '0' => {

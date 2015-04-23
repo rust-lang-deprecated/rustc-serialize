@@ -15,7 +15,7 @@ Core encoding and decoding interfaces.
 */
 
 use std::cell::{Cell, RefCell};
-use std::ffi::{AsOsStr, OsString};
+use std::ffi::OsString;
 use std::path;
 use std::rc::Rc;
 use std::sync::Arc;
