@@ -1490,7 +1490,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
     }
 
     fn parse_u64(&mut self) -> Result<u64, ParserError> {
-        let mut accum = 0;
+        let mut accum: u64 = 0;
 
         match self.ch_or_null() {
             '0' => {
