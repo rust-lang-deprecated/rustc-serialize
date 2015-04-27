@@ -1480,7 +1480,6 @@ impl<T: Iterator<Item = char>> Parser<T> {
                 if res > (i64::MAX as u64) + 1 {
                     Error(SyntaxError(InvalidNumber, self.line, self.col))
                 } else {
-                    println!("{:x} {:x}", res, !res);
                     I64Value((!res + 1) as i64)
                 }
             } else {
