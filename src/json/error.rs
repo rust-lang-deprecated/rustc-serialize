@@ -1,3 +1,7 @@
+use std::error::Error as StdError;
+use std::string;
+use std::{fmt, io};
+
 /// The errors that can arise while parsing a JSON stream.
 #[derive(Clone, Copy, PartialEq)]
 pub enum ErrorCode {
@@ -31,10 +35,10 @@ pub enum ParserError {
 impl PartialEq for ParserError {
     fn eq(&self, other: &ParserError) -> bool {
         match (self, other) {
-            (&SyntaxError(msg0, line0, col0), &SyntaxError(msg1, line1, col1)) =>
+            (&ParserError::SyntaxError(msg0, line0, col0), &ParserError::SyntaxError(msg1, line1, col1)) =>
                 msg0 == msg1 && line0 == line1 && col0 == col1,
-            (&IoError(_), _) => false,
-            (_, &IoError(_)) => false,
+            (&ParserError::IoError(_), _) => false,
+            (_, &ParserError::IoError(_)) => false,
         }
     }
 }
@@ -42,29 +46,26 @@ impl PartialEq for ParserError {
 /// Returns a readable error string for a given error code.
 pub fn error_str(error: ErrorCode) -> &'static str {
     match error {
-        InvalidSyntax => "invalid syntax",
-        InvalidNumber => "invalid number",
-        EOFWhileParsingObject => "EOF While parsing object",
-        EOFWhileParsingArray => "EOF While parsing array",
-        EOFWhileParsingValue => "EOF While parsing value",
-        EOFWhileParsingString => "EOF While parsing string",
-        KeyMustBeAString => "key must be a string",
-        ExpectedColon => "expected `:`",
-        TrailingCharacters => "trailing characters",
-        TrailingComma => "trailing comma",
-        InvalidEscape => "invalid escape",
-        UnrecognizedHex => "invalid \\u{ esc}ape (unrecognized hex)",
-        NotFourDigit => "invalid \\u{ esc}ape (not four digits)",
-        ControlCharacterInString => "unescaped control character in string",
-        NotUtf8 => "contents not utf-8",
-        InvalidUnicodeCodePoint => "invalid Unicode code point",
-        LoneLeadingSurrogateInHexEscape => "lone leading surrogate in hex escape",
-        UnexpectedEndOfHexEscape => "unexpected end of hex escape",
+        ErrorCode::InvalidSyntax => "invalid syntax",
+        ErrorCode::InvalidNumber => "invalid number",
+        ErrorCode::EOFWhileParsingObject => "EOF While parsing object",
+        ErrorCode::EOFWhileParsingArray => "EOF While parsing array",
+        ErrorCode::EOFWhileParsingValue => "EOF While parsing value",
+        ErrorCode::EOFWhileParsingString => "EOF While parsing string",
+        ErrorCode::KeyMustBeAString => "key must be a string",
+        ErrorCode::ExpectedColon => "expected `:`",
+        ErrorCode::TrailingCharacters => "trailing characters",
+        ErrorCode::TrailingComma => "trailing comma",
+        ErrorCode::InvalidEscape => "invalid escape",
+        ErrorCode::UnrecognizedHex => "invalid \\u{ esc}ape (unrecognized hex)",
+        ErrorCode::NotFourDigit => "invalid \\u{ esc}ape (not four digits)",
+        ErrorCode::ControlCharacterInString => "unescaped control character in string",
+        ErrorCode::NotUtf8 => "contents not utf-8",
+        ErrorCode::InvalidUnicodeCodePoint => "invalid Unicode code point",
+        ErrorCode::LoneLeadingSurrogateInHexEscape => "lone leading surrogate in hex escape",
+        ErrorCode::UnexpectedEndOfHexEscape => "unexpected end of hex escape",
     }
 }
-
-// Builder and Parser have the same errors.
-pub type BuilderError = ParserError;
 
 #[derive(PartialEq, Debug)]
 pub enum DecoderError {
@@ -92,8 +93,8 @@ impl fmt::Debug for ErrorCode {
     }
 }
 
-fn io_error_to_error(err: io::Error) -> ParserError {
-    IoError(err)
+pub fn io_error_to_error(err: io::Error) -> ParserError {
+    ParserError::IoError(err)
 }
 
 impl StdError for DecoderError {
@@ -135,6 +136,3 @@ impl fmt::Display for EncoderError {
 impl From<fmt::Error> for EncoderError {
     fn from(err: fmt::Error) -> EncoderError { EncoderError::FmtError(err) }
 }
-
-pub type EncodeResult<T> = Result<T, EncoderError>;
-pub type DecodeResult<T> = Result<T, DecoderError>;

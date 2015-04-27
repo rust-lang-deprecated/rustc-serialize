@@ -1,3 +1,10 @@
+use json::json::FormatShim;
+use json::encoder::Encoder;
+
+use std::fmt;
+
+use Encodable;
+
 pub struct AsJson<'a, T: 'a>
 {
     inner: &'a T
@@ -13,4 +20,10 @@ impl<'a, T: Encodable> fmt::Display for AsJson<'a, T> {
             Err(_) => Err(fmt::Error)
         }
     }
+}
+
+/// Create an `AsJson` wrapper which can be used to print a value as JSON
+/// on-the-fly via `write!`
+pub fn as_json<T: Encodable>(t: &T) -> AsJson<T> {
+    AsJson { inner: t }
 }

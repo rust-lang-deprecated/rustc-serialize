@@ -1,3 +1,8 @@
+use json::json::Json;
+
+use std::collections::{HashMap, BTreeMap};
+use std::string;
+
 /// A trait for converting values to JSON
 pub trait ToJson {
     /// Converts the value of `self` to an instance of JSON

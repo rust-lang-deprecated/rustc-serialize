@@ -1,3 +1,33 @@
+use json::encoder::Encoder;
+use json::error::{ErrorCode, ParserError};
+use json::builder::{Builder, BuilderError};
+use json::pretty_json::PrettyJson;
+
+use std::collections::BTreeMap;
+use std::i64;
+use std::ops::Index;
+use std::str::FromStr;
+use std::string;
+use std::{fmt, io, str};
+
+use Encodable;
+
+pub type Array = Vec<Json>;
+pub type Object = BTreeMap<string::String, Json>;
+
+pub struct FormatShim<'a, 'b: 'a> {
+    pub inner: &'a mut fmt::Formatter<'b>,
+}
+
+impl<'a, 'b> fmt::Write for FormatShim<'a, 'b> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        match self.inner.write_str(s) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(fmt::Error)
+        }
+    }
+}
+
 /// Represents a json value
 #[derive(Clone, PartialEq, PartialOrd, Debug)]
 pub enum Json {
@@ -18,13 +48,14 @@ impl Json {
             let mut c = Vec::new();
             match rdr.read_to_end(&mut c) {
                 Ok(_)  => (),
-                Err(e) => return Err(io_error_to_error(e))
+                Err(e) => return Err(error::io_error_to_error(e))
             }
             c
         };
         let s = match str::from_utf8(&contents).ok() {
             Some(s) => s,
-            _       => return Err(SyntaxError(NotUtf8, 0, 0))
+            _       => return Err(
+                    ParserError::SyntaxError(ErrorCode::NotUtf8, 0, 0))
         };
         let mut builder = Builder::new(s.chars());
         builder.build()
@@ -39,7 +70,7 @@ impl Json {
     /// Borrow this json object as a pretty object to generate a pretty
     /// representation for it via `Display`.
     pub fn pretty(&self) -> PrettyJson {
-        PrettyJson { inner: self }
+        PrettyJson::new(self)
     }
 
      /// If the Json value is an Object, returns the value associated with the provided key.

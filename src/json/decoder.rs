@@ -1,3 +1,11 @@
+use json::json::Json;
+use json::error::DecoderError;
+
+use std::string;
+use std::f64;
+
+pub type DecodeResult<T> = Result<T, DecoderError>;
+
 /// A structure to decode JSON to values in rust.
 pub struct Decoder {
     stack: Vec<Json>,
@@ -14,7 +22,7 @@ impl Decoder {
     fn pop(&mut self) -> DecodeResult<Json> {
         match self.stack.pop() {
             Some(s) => Ok(s),
-            None => Err(EOF),
+            None => Err(DecoderError::EOF),
         }
     }
 }
@@ -23,7 +31,7 @@ macro_rules! expect {
     ($e:expr, Null) => ({
         match try!($e) {
             Json::Null => Ok(()),
-            other => Err(ExpectedError("Null".to_string(),
+            other => Err(DecoderError::ExpectedError("Null".to_string(),
                                        format!("{}", other)))
         }
     });
@@ -31,7 +39,7 @@ macro_rules! expect {
         match try!($e) {
             Json::$t(v) => Ok(v),
             other => {
-                Err(ExpectedError(stringify!($t).to_string(),
+                Err(DecoderError::ExpectedError(stringify!($t).to_string(),
                                   format!("{}", other)))
             }
         }
@@ -48,7 +56,7 @@ macro_rules! read_primitive {
                     if i == other as i64 && (other > 0) == (i > 0) {
                         Ok(other)
                     } else {
-                        Err(ExpectedError("Number".to_string(), i.to_string()))
+                        Err(DecoderError::ExpectedError("Number".to_string(), i.to_string()))
                     }
                 }
                 Json::U64(u) => {
@@ -56,20 +64,20 @@ macro_rules! read_primitive {
                     if u == other as u64 && other >= 0 {
                         Ok(other)
                     } else {
-                        Err(ExpectedError("Number".to_string(), u.to_string()))
+                        Err(DecoderError::ExpectedError("Number".to_string(), u.to_string()))
                     }
                 }
                 Json::F64(f) => {
-                    Err(ExpectedError("Integer".to_string(), f.to_string()))
+                    Err(DecoderError::ExpectedError("Integer".to_string(), f.to_string()))
                 }
                 // re: #12967.. a type w/ numeric keys (ie HashMap<usize, V> etc)
                 // is going to have a string here, as per JSON spec.
                 Json::String(s) => match s.parse() {
                     Ok(f)  => Ok(f),
-                    Err(_) => Err(ExpectedError("Number".to_string(), s)),
+                    Err(_) => Err(DecoderError::ExpectedError("Number".to_string(), s)),
                 },
                 value => {
-                    Err(ExpectedError("Number".to_string(), value.to_string()))
+                    Err(DecoderError::ExpectedError("Number".to_string(), value.to_string()))
                 }
             }
         }
@@ -108,11 +116,11 @@ impl ::Decoder for Decoder {
                 // is going to have a string here, as per JSON spec.
                 match s.parse() {
                     Ok(f)  => Ok(f),
-                    Err(_) => Err(ExpectedError("Number".to_string(), s)),
+                    Err(_) => Err(DecoderError::ExpectedError("Number".to_string(), s)),
                 }
             },
             Json::Null => Ok(f64::NAN),
-            value => Err(ExpectedError("Number".to_string(), format!("{}", value)))
+            value => Err(DecoderError::ExpectedError("Number".to_string(), format!("{}", value)))
         }
     }
 
@@ -130,7 +138,7 @@ impl ::Decoder for Decoder {
                 _ => ()
             }
         }
-        Err(ExpectedError("single character string".to_string(), format!("{}", s)))
+        Err(DecoderError::ExpectedError("single character string".to_string(), format!("{}", s)))
     }
 
     fn read_str(&mut self) -> DecodeResult<string::String> {
@@ -153,10 +161,10 @@ impl ::Decoder for Decoder {
                 let n = match o.remove(&"variant".to_string()) {
                     Some(Json::String(s)) => s,
                     Some(val) => {
-                        return Err(ExpectedError("String".to_string(), format!("{}", val)))
+                        return Err(DecoderError::ExpectedError("String".to_string(), format!("{}", val)))
                     }
                     None => {
-                        return Err(MissingFieldError("variant".to_string()))
+                        return Err(DecoderError::MissingFieldError("variant".to_string()))
                     }
                 };
                 match o.remove(&"fields".to_string()) {
@@ -166,21 +174,21 @@ impl ::Decoder for Decoder {
                         }
                     },
                     Some(val) => {
-                        return Err(ExpectedError("Array".to_string(), format!("{}", val)))
+                        return Err(DecoderError::ExpectedError("Array".to_string(), format!("{}", val)))
                     }
                     None => {
-                        return Err(MissingFieldError("fields".to_string()))
+                        return Err(DecoderError::MissingFieldError("fields".to_string()))
                     }
                 }
                 n
             }
             json => {
-                return Err(ExpectedError("String or Object".to_string(), format!("{}", json)))
+                return Err(DecoderError::ExpectedError("String or Object".to_string(), format!("{}", json)))
             }
         };
         let idx = match names.iter().position(|n| *n == name) {
             Some(idx) => idx,
-            None => return Err(UnknownVariantError(name))
+            None => return Err(DecoderError::UnknownVariantError(name))
         };
         f(self, idx)
     }
@@ -202,14 +210,14 @@ impl ::Decoder for Decoder {
                                          _name: &str,
                                          idx: usize,
                                          f: F)
-                                         -> DecodeResult<T> where
-        F: FnOnce(&mut Decoder) -> DecodeResult<T>,
+                                         -> DecodeResult<T>
+            where F: FnOnce(&mut Decoder) -> DecodeResult<T>,
     {
         self.read_enum_variant_arg(idx, f)
     }
 
-    fn read_struct<T, F>(&mut self, _name: &str, _len: usize, f: F) -> DecodeResult<T> where
-        F: FnOnce(&mut Decoder) -> DecodeResult<T>,
+    fn read_struct<T, F>(&mut self, _name: &str, _len: usize, f: F) -> DecodeResult<T>
+            where F: FnOnce(&mut Decoder) -> DecodeResult<T>,
     {
         let value = try!(f(self));
         try!(self.pop());
@@ -220,8 +228,8 @@ impl ::Decoder for Decoder {
                                name: &str,
                                _idx: usize,
                                f: F)
-                               -> DecodeResult<T> where
-        F: FnOnce(&mut Decoder) -> DecodeResult<T>,
+                               -> DecodeResult<T>
+            where F: FnOnce(&mut Decoder) -> DecodeResult<T>,
     {
         let mut obj = try!(expect!(self.pop(), Object));
 
@@ -232,7 +240,7 @@ impl ::Decoder for Decoder {
                 self.stack.push(Json::Null);
                 match f(self) {
                     Ok(x) => x,
-                    Err(_) => return Err(MissingFieldError(name.to_string())),
+                    Err(_) => return Err(DecoderError::MissingFieldError(name.to_string())),
                 }
             },
             Some(json) => {
@@ -244,20 +252,20 @@ impl ::Decoder for Decoder {
         Ok(value)
     }
 
-    fn read_tuple<T, F>(&mut self, tuple_len: usize, f: F) -> DecodeResult<T> where
-        F: FnOnce(&mut Decoder) -> DecodeResult<T>,
+    fn read_tuple<T, F>(&mut self, tuple_len: usize, f: F) -> DecodeResult<T>
+            where F: FnOnce(&mut Decoder) -> DecodeResult<T>,
     {
         self.read_seq(move |d, len| {
             if len == tuple_len {
                 f(d)
             } else {
-                Err(ExpectedError(format!("Tuple{}", tuple_len), format!("Tuple{}", len)))
+                Err(DecoderError::ExpectedError(format!("Tuple{}", tuple_len), format!("Tuple{}", len)))
             }
         })
     }
 
-    fn read_tuple_arg<T, F>(&mut self, idx: usize, f: F) -> DecodeResult<T> where
-        F: FnOnce(&mut Decoder) -> DecodeResult<T>,
+    fn read_tuple_arg<T, F>(&mut self, idx: usize, f: F) -> DecodeResult<T>
+            where F: FnOnce(&mut Decoder) -> DecodeResult<T>,
     {
         self.read_seq_elt(idx, f)
     }
@@ -266,8 +274,8 @@ impl ::Decoder for Decoder {
                                _name: &str,
                                len: usize,
                                f: F)
-                               -> DecodeResult<T> where
-        F: FnOnce(&mut Decoder) -> DecodeResult<T>,
+                               -> DecodeResult<T>
+            where F: FnOnce(&mut Decoder) -> DecodeResult<T>,
     {
         self.read_tuple(len, f)
     }
@@ -319,19 +327,30 @@ impl ::Decoder for Decoder {
         f(self, len)
     }
 
-    fn read_map_elt_key<T, F>(&mut self, _idx: usize, f: F) -> DecodeResult<T> where
-       F: FnOnce(&mut Decoder) -> DecodeResult<T>,
+    fn read_map_elt_key<T, F>(&mut self, _idx: usize, f: F) -> DecodeResult<T>
+            where F: FnOnce(&mut Decoder) -> DecodeResult<T>,
     {
         f(self)
     }
 
-    fn read_map_elt_val<T, F>(&mut self, _idx: usize, f: F) -> DecodeResult<T> where
-       F: FnOnce(&mut Decoder) -> DecodeResult<T>,
+    fn read_map_elt_val<T, F>(&mut self, _idx: usize, f: F) -> DecodeResult<T>
+            where F: FnOnce(&mut Decoder) -> DecodeResult<T>,
     {
         f(self)
     }
 
     fn error(&mut self, err: &str) -> DecoderError {
-        ApplicationError(err.to_string())
+        DecoderError::ApplicationError(err.to_string())
     }
+}
+
+/// Shortcut function to decode a JSON `&str` into an object
+pub fn decode<T: ::Decodable>(s: &str) -> DecodeResult<T> {
+    let json = match Json::from_str(s) {
+        Ok(x) => x,
+        Err(e) => return Err(DecoderError::ParseError(e))
+    };
+
+    let mut decoder = Decoder::new(json);
+    ::Decodable::decode(&mut decoder)
 }

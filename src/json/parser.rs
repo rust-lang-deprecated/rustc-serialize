@@ -1,3 +1,11 @@
+use json::JsonEvent;
+use json::{ErrorCode, ParserError};
+use json::stack::{Stack, SemiPubMethods};
+
+use std::i64;
+use std::string;
+use std::{char};
+
 /// A streaming JSON parser implemented as an iterator of JsonEvent, consuming
 /// an iterator of char.
 pub struct Parser<T> {
@@ -16,18 +24,18 @@ impl<T: Iterator<Item = char>> Iterator for Parser<T> {
     type Item = JsonEvent;
 
     fn next(&mut self) -> Option<JsonEvent> {
-        if self.state == ParseFinished {
+        if self.state == ParserState::ParseFinished {
             return None;
         }
 
-        if self.state == ParseBeforeFinish {
+        if self.state == ParserState::ParseBeforeFinish {
             self.parse_whitespace();
             // Make sure there is no trailing characters.
             if self.eof() {
-                self.state = ParseFinished;
+                self.state = ParserState::ParseFinished;
                 return None;
             } else {
-                return Some(self.error_event(TrailingCharacters));
+                return Some(self.error_event(ErrorCode::TrailingCharacters));
             }
         }
         return Some(self.parse());
@@ -43,7 +51,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
             line: 1,
             col: 0,
             stack: Stack::new(),
-            state: ParseStart,
+            state: ParserState::ParseStart,
         };
         p.bump();
         return p;
@@ -76,8 +84,8 @@ impl<T: Iterator<Item = char>> Parser<T> {
         self.ch == Some(c)
     }
 
-    fn error<E>(&self, reason: ErrorCode) -> Result<E, ParserError> {
-        Err(SyntaxError(reason, self.line, self.col))
+    pub fn error<E>(&self, reason: ErrorCode) -> Result<E, ParserError> {
+        Err(ParserError::SyntaxError(reason, self.line, self.col))
     }
 
     fn parse_whitespace(&mut self) {
@@ -97,7 +105,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
 
         let res = match self.parse_u64() {
             Ok(res) => res,
-            Err(e) => { return Error(e); }
+            Err(e) => { return JsonEvent::Error(e); }
         };
 
         if self.ch_is('.') || self.ch_is('e') || self.ch_is('E') {
@@ -106,33 +114,35 @@ impl<T: Iterator<Item = char>> Parser<T> {
             if self.ch_is('.') {
                 res = match self.parse_decimal(res) {
                     Ok(res) => res,
-                    Err(e) => { return Error(e); }
+                    Err(e) => { return JsonEvent::Error(e); }
                 };
             }
 
             if self.ch_is('e') || self.ch_is('E') {
                 res = match self.parse_exponent(res) {
                     Ok(res) => res,
-                    Err(e) => { return Error(e); }
+                    Err(e) => {
+                        return JsonEvent::Error(e);
+                    }
                 };
             }
-
             if neg {
                 res *= -1.0;
             }
-
-            F64Value(res)
+            JsonEvent::F64Value(res)
         } else {
             if neg {
                 // Make sure we don't underflow.
                 if res > (i64::MAX as u64) + 1 {
-                    Error(SyntaxError(InvalidNumber, self.line, self.col))
+                    JsonEvent::Error(ParserError::SyntaxError(
+                            ErrorCode::InvalidNumber,
+                            self.line,
+                            self.col))
                 } else {
-                    println!("{:x} {:x}", res, !res);
-                    I64Value((!res + 1) as i64)
+                    JsonEvent::I64Value((!res + 1) as i64)
                 }
             } else {
-                U64Value(res)
+                JsonEvent::U64Value(res)
             }
         }
     }
@@ -146,7 +156,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
 
                 // A leading '0' must be the only digit before the decimal point.
                 match self.ch_or_null() {
-                    '0' ... '9' => return self.error(InvalidNumber),
+                    '0' ... '9' => return self.error(ErrorCode::InvalidNumber),
                     _ => ()
                 }
             },
@@ -158,7 +168,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
                                 ($e: expr) => {
                                     match $e {
                                         Some(v) => v,
-                                        None => return self.error(InvalidNumber)
+                                        None => return self.error(ErrorCode::InvalidNumber)
                                     }
                                 }
                             }
@@ -171,7 +181,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
                     }
                 }
             }
-            _ => return self.error(InvalidNumber),
+            _ => return self.error(ErrorCode::InvalidNumber),
         }
 
         Ok(accum)
@@ -183,7 +193,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
         // Make sure a digit follows the decimal place.
         match self.ch_or_null() {
             '0' ... '9' => (),
-             _ => return self.error(InvalidNumber)
+             _ => return self.error(ErrorCode::InvalidNumber)
         }
 
         let mut dec = 1.0;
@@ -217,7 +227,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
         // Make sure a digit follows the exponent place.
         match self.ch_or_null() {
             '0' ... '9' => (),
-            _ => return self.error(InvalidNumber)
+            _ => return self.error(ErrorCode::InvalidNumber)
         }
         while !self.eof() {
             match self.ch_or_null() {
@@ -250,7 +260,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
                 c @ '0' ... '9' => n * 16 + ((c as u16) - ('0' as u16)),
                 c @ 'a' ... 'f' => n * 16 + (10 + (c as u16) - ('a' as u16)),
                 c @ 'A' ... 'F' => n * 16 + (10 + (c as u16) - ('A' as u16)),
-                _ => return self.error(InvalidEscape)
+                _ => return self.error(ErrorCode::InvalidEscape)
             };
 
             i += 1;
@@ -266,7 +276,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
         loop {
             self.bump();
             if self.eof() {
-                return self.error(EOFWhileParsingString);
+                return self.error(ErrorCode::EOFWhileParsingString);
             }
 
             if escape {
@@ -281,7 +291,8 @@ impl<T: Iterator<Item = char>> Parser<T> {
                     't' => res.push('\t'),
                     'u' => match try!(self.decode_hex_escape()) {
                         0xDC00 ... 0xDFFF => {
-                            return self.error(LoneLeadingSurrogateInHexEscape)
+                            return self.error(
+                                    ErrorCode::LoneLeadingSurrogateInHexEscape)
                         }
 
                         // Non-BMP characters are encoded as a sequence of
@@ -289,12 +300,14 @@ impl<T: Iterator<Item = char>> Parser<T> {
                         n1 @ 0xD800 ... 0xDBFF => {
                             match (self.next_char(), self.next_char()) {
                                 (Some('\\'), Some('u')) => (),
-                                _ => return self.error(UnexpectedEndOfHexEscape),
+                                _ => return self.error(
+                                        ErrorCode::UnexpectedEndOfHexEscape),
                             }
 
                             let n2 = try!(self.decode_hex_escape());
                             if n2 < 0xDC00 || n2 > 0xDFFF {
-                                return self.error(LoneLeadingSurrogateInHexEscape)
+                                return self.error(
+                                        ErrorCode::LoneLeadingSurrogateInHexEscape)
                             }
                             let c = (((n1 - 0xD800) as u32) << 10 |
                                      (n2 - 0xDC00) as u32) + 0x1_0000;
@@ -303,10 +316,11 @@ impl<T: Iterator<Item = char>> Parser<T> {
 
                         n => match char::from_u32(n as u32) {
                             Some(c) => res.push(c),
-                            None => return self.error(InvalidUnicodeCodePoint),
+                            None => return self.error(
+                                    ErrorCode::InvalidUnicodeCodePoint),
                         },
                     },
-                    _ => return self.error(InvalidEscape),
+                    _ => return self.error(ErrorCode::InvalidEscape),
                 }
                 escape = false;
             } else if self.ch_is('\\') {
@@ -318,7 +332,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
                         return Ok(res);
                     },
                     Some(c) if c.is_control() =>
-                        return self.error(ControlCharacterInString),
+                        return self.error(ErrorCode::ControlCharacterInString),
                     Some(c) => res.push(c),
                     None => unreachable!()
                 }
@@ -337,38 +351,39 @@ impl<T: Iterator<Item = char>> Parser<T> {
             // The only paths where the loop can spin a new iteration
             // are in the cases ParseArrayComma and ParseObjectComma if ','
             // is parsed. In these cases the state is set to (respectively)
-            // ParseArray(false) and ParseObject(false), which always return,
+            // ParserState::ParseArray(false) and ParseObject(false),
+            // which always return,
             // so there is no risk of getting stuck in an infinite loop.
             // All other paths return before the end of the loop's iteration.
             self.parse_whitespace();
 
             match self.state {
-                ParseStart => {
+                ParserState::ParseStart => {
                     return self.parse_start();
                 }
-                ParseArray(first) => {
+                ParserState::ParseArray(first) => {
                     return self.parse_array(first);
                 }
-                ParseArrayComma => {
+                ParserState::ParseArrayComma => {
                     match self.parse_array_comma_or_end() {
                         Some(evt) => { return evt; }
                         None => {}
                     }
                 }
-                ParseObject(first) => {
+                ParserState::ParseObject(first) => {
                     return self.parse_object(first);
                 }
-                ParseObjectComma => {
+                ParserState::ParseObjectComma => {
                     self.stack.pop();
                     if self.ch_is(',') {
-                        self.state = ParseObject(false);
+                        self.state = ParserState::ParseObject(false);
                         self.bump();
                     } else {
                         return self.parse_object_end();
                     }
                 }
                 _ => {
-                    return self.error_event(InvalidSyntax);
+                    return self.error_event(ErrorCode::InvalidSyntax);
                 }
             }
         }
@@ -377,10 +392,10 @@ impl<T: Iterator<Item = char>> Parser<T> {
     fn parse_start(&mut self) -> JsonEvent {
         let val = self.parse_value();
         self.state = match val {
-            Error(_) => ParseFinished,
-            ArrayStart => ParseArray(true),
-            ObjectStart => ParseObject(true),
-            _ => ParseBeforeFinish,
+            JsonEvent::Error(_) => ParserState::ParseFinished,
+            JsonEvent::ArrayStart => ParserState::ParseArray(true),
+            JsonEvent::ObjectStart => ParserState::ParseObject(true),
+            _ => ParserState::ParseBeforeFinish,
         };
         return val;
     }
@@ -388,17 +403,17 @@ impl<T: Iterator<Item = char>> Parser<T> {
     fn parse_array(&mut self, first: bool) -> JsonEvent {
         if self.ch_is(']') {
             if !first {
-                self.error_event(InvalidSyntax)
+                self.error_event(ErrorCode::InvalidSyntax)
             } else {
                 self.state = if self.stack.is_empty() {
-                    ParseBeforeFinish
+                    ParserState::ParseBeforeFinish
                 } else if self.stack.last_is_index() {
-                    ParseArrayComma
+                    ParserState::ParseArrayComma
                 } else {
-                    ParseObjectComma
+                    ParserState::ParseObjectComma
                 };
                 self.bump();
-                ArrayEnd
+                JsonEvent::ArrayEnd
             }
         } else {
             if first {
@@ -406,10 +421,10 @@ impl<T: Iterator<Item = char>> Parser<T> {
             }
             let val = self.parse_value();
             self.state = match val {
-                Error(_) => ParseFinished,
-                ArrayStart => ParseArray(true),
-                ObjectStart => ParseObject(true),
-                _ => ParseArrayComma,
+                JsonEvent::Error(_) => ParserState::ParseFinished,
+                JsonEvent::ArrayStart => ParserState::ParseArray(true),
+                JsonEvent::ObjectStart => ParserState::ParseObject(true),
+                _ => ParserState::ParseArrayComma,
             };
             val
         }
@@ -418,24 +433,24 @@ impl<T: Iterator<Item = char>> Parser<T> {
     fn parse_array_comma_or_end(&mut self) -> Option<JsonEvent> {
         if self.ch_is(',') {
             self.stack.bump_index();
-            self.state = ParseArray(false);
+            self.state = ParserState::ParseArray(false);
             self.bump();
             None
         } else if self.ch_is(']') {
             self.stack.pop();
             self.state = if self.stack.is_empty() {
-                ParseBeforeFinish
+                ParserState::ParseBeforeFinish
             } else if self.stack.last_is_index() {
-                ParseArrayComma
+                ParserState::ParseArrayComma
             } else {
-                ParseObjectComma
+                ParserState::ParseObjectComma
             };
             self.bump();
-            Some(ArrayEnd)
+            Some(JsonEvent::ArrayEnd)
         } else if self.eof() {
-            Some(self.error_event(EOFWhileParsingArray))
+            Some(self.error_event(ErrorCode::EOFWhileParsingArray))
         } else {
-            Some(self.error_event(InvalidSyntax))
+            Some(self.error_event(ErrorCode::InvalidSyntax))
         }
     }
 
@@ -443,39 +458,39 @@ impl<T: Iterator<Item = char>> Parser<T> {
         if self.ch_is('}') {
             if !first {
                 if self.stack.is_empty() {
-                    return self.error_event(TrailingComma);
+                    return self.error_event(ErrorCode::TrailingComma);
                 } else {
                     self.stack.pop();
                 }
             }
             self.state = if self.stack.is_empty() {
-                ParseBeforeFinish
+                ParserState::ParseBeforeFinish
             } else if self.stack.last_is_index() {
-                ParseArrayComma
+                ParserState::ParseArrayComma
             } else {
-                ParseObjectComma
+                ParserState::ParseObjectComma
             };
             self.bump();
-            return ObjectEnd;
+            return JsonEvent::ObjectEnd;
         }
         if self.eof() {
-            return self.error_event(EOFWhileParsingObject);
+            return self.error_event(ErrorCode::EOFWhileParsingObject);
         }
         if !self.ch_is('"') {
-            return self.error_event(KeyMustBeAString);
+            return self.error_event(ErrorCode::KeyMustBeAString);
         }
         let s = match self.parse_str() {
             Ok(s) => s,
             Err(e) => {
-                self.state = ParseFinished;
-                return Error(e);
+                self.state = ParserState::ParseFinished;
+                return JsonEvent::Error(e);
             }
         };
         self.parse_whitespace();
         if self.eof() {
-            return self.error_event(EOFWhileParsingObject);
+            return self.error_event(ErrorCode::EOFWhileParsingObject);
         } else if self.ch_or_null() != ':' {
-            return self.error_event(ExpectedColon);
+            return self.error_event(ErrorCode::ExpectedColon);
         }
         self.stack.push_key(s);
         self.bump();
@@ -484,10 +499,10 @@ impl<T: Iterator<Item = char>> Parser<T> {
         let val = self.parse_value();
 
         self.state = match val {
-            Error(_) => ParseFinished,
-            ArrayStart => ParseArray(true),
-            ObjectStart => ParseObject(true),
-            _ => ParseObjectComma,
+            JsonEvent::Error(_) => ParserState::ParseFinished,
+            JsonEvent::ArrayStart => ParserState::ParseArray(true),
+            JsonEvent::ObjectStart => ParserState::ParseObject(true),
+            _ => ParserState::ParseObjectComma,
         };
         return val;
     }
@@ -495,41 +510,43 @@ impl<T: Iterator<Item = char>> Parser<T> {
     fn parse_object_end(&mut self) -> JsonEvent {
         if self.ch_is('}') {
             self.state = if self.stack.is_empty() {
-                ParseBeforeFinish
+                ParserState::ParseBeforeFinish
             } else if self.stack.last_is_index() {
-                ParseArrayComma
+                ParserState::ParseArrayComma
             } else {
-                ParseObjectComma
+                ParserState::ParseObjectComma
             };
             self.bump();
-            ObjectEnd
+            JsonEvent::ObjectEnd
         } else if self.eof() {
-            self.error_event(EOFWhileParsingObject)
+            self.error_event(ErrorCode::EOFWhileParsingObject)
         } else {
-            self.error_event(InvalidSyntax)
+            self.error_event(ErrorCode::InvalidSyntax)
         }
     }
 
     fn parse_value(&mut self) -> JsonEvent {
-        if self.eof() { return self.error_event(EOFWhileParsingValue); }
+        if self.eof() {
+            return self.error_event(ErrorCode::EOFWhileParsingValue);
+        }
         match self.ch_or_null() {
-            'n' => { self.parse_ident("ull", NullValue) }
-            't' => { self.parse_ident("rue", BooleanValue(true)) }
-            'f' => { self.parse_ident("alse", BooleanValue(false)) }
+            'n' => { self.parse_ident("ull", JsonEvent::NullValue) }
+            't' => { self.parse_ident("rue", JsonEvent::BooleanValue(true))}
+            'f' => { self.parse_ident("alse", JsonEvent::BooleanValue(false))}
             '0' ... '9' | '-' => self.parse_number(),
             '"' => match self.parse_str() {
-                Ok(s) => StringValue(s),
-                Err(e) => Error(e),
+                Ok(s) => JsonEvent::StringValue(s),
+                Err(e) => JsonEvent::Error(e),
             },
             '[' => {
                 self.bump();
-                ArrayStart
+                JsonEvent::ArrayStart
             }
             '{' => {
                 self.bump();
-                ObjectStart
+                JsonEvent::ObjectStart
             }
-            _ => { self.error_event(InvalidSyntax) }
+            _ => { self.error_event(ErrorCode::InvalidSyntax) }
         }
     }
 
@@ -538,13 +555,16 @@ impl<T: Iterator<Item = char>> Parser<T> {
             self.bump();
             value
         } else {
-            Error(SyntaxError(InvalidSyntax, self.line, self.col))
+            JsonEvent::Error(ParserError::SyntaxError(
+                    ErrorCode::InvalidSyntax,
+                    self.line,
+                    self.col))
         }
     }
 
     fn error_event(&mut self, reason: ErrorCode) -> JsonEvent {
-        self.state = ParseFinished;
-        Error(SyntaxError(reason, self.line, self.col))
+        self.state = ParserState::ParseFinished;
+        JsonEvent::Error(ParserError::SyntaxError(reason, self.line, self.col))
     }
 }
 
@@ -565,4 +585,3 @@ enum ParserState {
     // Parsing can't continue.
     ParseFinished,
 }
-

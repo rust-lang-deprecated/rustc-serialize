@@ -1,3 +1,5 @@
+use std::{str, string};
+
 /// A Stack represents the current position of the parser in the logical
 /// structure of the JSON stream.
 /// For example foo.bar[3].x
@@ -39,8 +41,8 @@ impl Stack {
     /// at the top.
     pub fn get<'l>(&'l self, idx: usize) -> StackElement<'l> {
         match self.stack[idx] {
-            InternalIndex(i) => StackElement::Index(i),
-            InternalKey(start, size) => {
+            InternalStackElement::InternalIndex(i) => StackElement::Index(i),
+            InternalStackElement::InternalKey(start, size) => {
                 StackElement::Key(str::from_utf8(
                     &self.str_buffer[start as usize .. start as usize + size as usize]).unwrap())
             }
@@ -81,18 +83,33 @@ impl Stack {
     pub fn top<'l>(&'l self) -> Option<StackElement<'l>> {
         return match self.stack.last() {
             None => None,
-            Some(&InternalIndex(i)) => Some(StackElement::Index(i)),
-            Some(&InternalKey(start, size)) => {
+            Some(&InternalStackElement::InternalIndex(i)) => Some(StackElement::Index(i)),
+            Some(&InternalStackElement::InternalKey(start, size)) => {
                 Some(StackElement::Key(str::from_utf8(
                     &self.str_buffer[start as usize .. (start+size) as usize]
                 ).unwrap()))
             }
         }
     }
+}
 
-    // Used by Parser to insert Key elements at the top of the stack.
+// All the method of this trait are part of the Stack structure, 
+// but have to be exposed to other modules but not to the external 
+// users of the library. That'a why those methods are exposed via a trait.
+#[doc(hidden)]
+pub trait SemiPubMethods{
+    fn push_key(&mut self, key: string::String);
+    fn push_index(&mut self, index: u32);
+    fn pop(&mut self);
+    fn last_is_index(&self) -> bool;
+    fn bump_index(&mut self);
+}
+
+impl SemiPubMethods for Stack {
     fn push_key(&mut self, key: string::String) {
-        self.stack.push(InternalKey(self.str_buffer.len() as u16, key.len() as u16));
+        self.stack.push(InternalStackElement::InternalKey(
+                self.str_buffer.len() as u16,
+                key.len() as u16));
         for c in key.as_bytes().iter() {
             self.str_buffer.push(*c);
         }
@@ -100,18 +117,18 @@ impl Stack {
 
     // Used by Parser to insert Index elements at the top of the stack.
     fn push_index(&mut self, index: u32) {
-        self.stack.push(InternalIndex(index));
+        self.stack.push(InternalStackElement::InternalIndex(index));
     }
 
     // Used by Parser to remove the top-most element of the stack.
     fn pop(&mut self) {
         assert!(!self.is_empty());
         match *self.stack.last().unwrap() {
-            InternalKey(_, sz) => {
+            InternalStackElement::InternalKey(_, sz) => {
                 let new_size = self.str_buffer.len() - sz as usize;
                 self.str_buffer.truncate(new_size);
             }
-            InternalIndex(_) => {}
+            InternalStackElement::InternalIndex(_) => {}
         }
         self.stack.pop();
     }
@@ -120,7 +137,7 @@ impl Stack {
     fn last_is_index(&self) -> bool {
         if self.is_empty() { return false; }
         return match *self.stack.last().unwrap() {
-            InternalIndex(_) => true,
+            InternalStackElement::InternalIndex(_) => true,
             _ => false,
         }
     }
@@ -129,9 +146,9 @@ impl Stack {
     fn bump_index(&mut self) {
         let len = self.stack.len();
         let idx = match *self.stack.last().unwrap() {
-            InternalIndex(i) => { i + 1 }
+            InternalStackElement::InternalIndex(i) => { i + 1 }
             _ => { panic!(); }
         };
-        self.stack[len - 1] = InternalIndex(idx);
+        self.stack[len - 1] = InternalStackElement::InternalIndex(idx);
     }
 }

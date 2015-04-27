@@ -9,6 +9,23 @@
 // except according to those terms.
 
 //! Support code for encoding and decoding types.
+//!
+//! # Usage
+//!
+//! This crate is [on crates.io](https://crates.io/crates/rustc-serialize) and
+//! can be used by adding `rustc-serialize` to the dependencies in your
+//! project's `Cargo.toml`.
+//!
+//! ```toml
+//! [dependencies]
+//! rustc-serialize = "0.3"
+//! ```
+//!
+//! and this to your crate root:
+//!
+//! ```rust
+//! extern crate rustc_serialize;
+//! ```
 
 #![doc(html_logo_url = "http://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
        html_favicon_url = "http://www.rust-lang.org/favicon.ico",
