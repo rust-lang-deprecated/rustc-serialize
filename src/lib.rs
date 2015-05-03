@@ -12,8 +12,9 @@
 //!
 //! # Usage
 //!
-//! This crates is [on crates.io](https://crates.io/crates/rustc-serialize) and can be used by
-//! adding `rustc-serialize` to your dependencies in your project's `Cargo.toml`.
+//! This crate is [on crates.io](https://crates.io/crates/rustc-serialize) and
+//! can be used by adding `rustc-serialize` to the dependencies in your
+//! project's `Cargo.toml`.
 //!
 //! ```toml
 //! [dependencies]
