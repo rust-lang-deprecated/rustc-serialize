@@ -384,10 +384,6 @@ impl fmt::Debug for ErrorCode {
     }
 }
 
-fn io_error_to_error(err: io::Error) -> ParserError {
-    IoError(err)
-}
-
 impl StdError for DecoderError {
     fn description(&self) -> &str { "decoder error" }
     fn cause(&self) -> Option<&StdError> {
@@ -404,6 +400,12 @@ impl fmt::Display for DecoderError {
     }
 }
 
+impl From<ParserError> for DecoderError {
+    fn from(err: ParserError) -> DecoderError {
+        ParseError(From::from(err))
+    }
+}
+
 impl StdError for ParserError {
     fn description(&self) -> &str { "failed to parse json" }
 }
@@ -411,6 +413,12 @@ impl StdError for ParserError {
 impl fmt::Display for ParserError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Debug::fmt(&self, f)
+    }
+}
+
+impl From<io::Error> for ParserError {
+    fn from(err: io::Error) -> ParserError {
+        IoError(err)
     }
 }
 
@@ -933,10 +941,7 @@ impl Json {
     pub fn from_reader(rdr: &mut io::Read) -> Result<Self, BuilderError> {
         let contents = {
             let mut c = Vec::new();
-            match rdr.read_to_end(&mut c) {
-                Ok(_)  => (),
-                Err(e) => return Err(io_error_to_error(e))
-            }
+            try!(rdr.read_to_end(&mut c));
             c
         };
         let s = match str::from_utf8(&contents).ok() {
