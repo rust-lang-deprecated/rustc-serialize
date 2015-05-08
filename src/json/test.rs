@@ -1,10 +1,7 @@
 #![cfg(test)]
 
-extern crate test;
-
 use self::Animal::*;
 use self::DecodeEnum::*;
-use self::test::Bencher;
 use {Encodable, Decodable};
 use json::json::Json;
 use json::json::Json::*;

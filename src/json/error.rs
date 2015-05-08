@@ -93,10 +93,6 @@ impl fmt::Debug for ErrorCode {
     }
 }
 
-pub fn io_error_to_error(err: io::Error) -> ParserError {
-    ParserError::IoError(err)
-}
-
 impl StdError for DecoderError {
     fn description(&self) -> &str { "decoder error" }
     fn cause(&self) -> Option<&StdError> {
@@ -113,6 +109,12 @@ impl fmt::Display for DecoderError {
     }
 }
 
+impl From<ParserError> for DecoderError {
+    fn from(err: ParserError) -> DecoderError {
+        DecoderError::ParseError(From::from(err))
+    }
+}
+
 impl StdError for ParserError {
     fn description(&self) -> &str { "failed to parse json" }
 }
@@ -120,6 +122,12 @@ impl StdError for ParserError {
 impl fmt::Display for ParserError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Debug::fmt(&self, f)
+    }
+}
+
+impl From<io::Error> for ParserError {
+    fn from(err: io::Error) -> ParserError {
+        ParserError::IoError(err)
     }
 }
 
