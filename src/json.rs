@@ -2954,7 +2954,7 @@ mod tests {
 
         let res: DecodeResult<i64> = super::decode("765.25252");
         assert_eq!(res, Err(ExpectedError("Integer".to_string(),
-                                          "765.25252".to_string())));
+                                          "765.2525199999999".to_string())));
     }
 
     #[test]
