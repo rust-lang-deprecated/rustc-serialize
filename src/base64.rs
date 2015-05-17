@@ -299,8 +299,6 @@ impl FromBase64 for [u8] {
 
 #[cfg(test)]
 mod tests {
-    extern crate test;
-    use self::test::Bencher;
     use base64::{Config, Newline, FromBase64, ToBase64, STANDARD, URL_SAFE};
 
     #[test]
@@ -405,26 +403,4 @@ mod tests {
                        v);
         }
     }
-
-    #[bench]
-    pub fn bench_to_base64(b: &mut Bencher) {
-        let s = "イロハニホヘト チリヌルヲ ワカヨタレソ ツネナラム \
-                 ウヰノオクヤマ ケフコエテ アサキユメミシ ヱヒモセスン";
-        b.iter(|| {
-            s.as_bytes().to_base64(STANDARD);
-        });
-        b.bytes = s.len() as u64;
-    }
-
-    #[bench]
-    pub fn bench_from_base64(b: &mut Bencher) {
-        let s = "イロハニホヘト チリヌルヲ ワカヨタレソ ツネナラム \
-                 ウヰノオクヤマ ケフコエテ アサキユメミシ ヱヒモセスン";
-        let sb = s.as_bytes().to_base64(STANDARD);
-        b.iter(|| {
-            sb.from_base64().unwrap();
-        });
-        b.bytes = sb.len() as u64;
-    }
-
 }

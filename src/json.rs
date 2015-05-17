@@ -2546,10 +2546,8 @@ impl FromStr for Json {
 
 #[cfg(test)]
 mod tests {
-    extern crate test;
     use self::Animal::*;
     use self::DecodeEnum::*;
-    use self::test::Bencher;
     use {Encodable, Decodable};
     use super::Json::*;
     use super::ErrorCode::*;
@@ -2953,8 +2951,11 @@ mod tests {
         assert_eq!(v, i64::MAX);
 
         let res: DecodeResult<i64> = super::decode("765.25252");
-        assert_eq!(res, Err(ExpectedError("Integer".to_string(),
-                                          "765.2525199999999".to_string())));
+        match res {
+            Ok(..) => panic!("expected an error"),
+            Err(ExpectedError(ref s, _)) => assert_eq!(s, "Integer"),
+            Err(..) => panic!("expected an 'expected integer' error"),
+        }
     }
 
     #[test]
@@ -3883,81 +3884,5 @@ mod tests {
         let serialized = "{\"variant\": \"Variant\", \"fields\": []}";
         let r: Result<ChatEvent, _> = json::decode(serialized);
         assert!(r.unwrap_err() == EOF);
-    }
-
-    #[bench]
-    fn bench_streaming_small(b: &mut Bencher) {
-        b.iter( || {
-            let mut parser = Parser::new(
-                r#"{
-                    "a": 1.0,
-                    "b": [
-                        true,
-                        "foo\nbar",
-                        { "c": {"d": null} }
-                    ]
-                }"#.chars()
-            );
-            loop {
-                match parser.next() {
-                    None => return,
-                    _ => {}
-                }
-            }
-        });
-    }
-    #[bench]
-    fn bench_small(b: &mut Bencher) {
-        b.iter( || {
-            let _ = Json::from_str(r#"{
-                "a": 1.0,
-                "b": [
-                    true,
-                    "foo\nbar",
-                    { "c": {"d": null} }
-                ]
-            }"#);
-        });
-    }
-
-    #[bench]
-    fn bench_decode_hex_escape(b: &mut Bencher) {
-        let mut src = "\"".to_string();
-        for _ in 0..10 {
-            src.push_str("\\uF975\\uf9bc\\uF9A0\\uF9C4\\uF975\\uf9bc\\uF9A0\\uF9C4");
-        }
-        src.push_str("\"");
-        b.iter( || {
-            let _ = Json::from_str(&src);
-        });
-    }
-
-    fn big_json() -> string::String {
-        let mut src = "[\n".to_string();
-        for _ in 0..500 {
-            src.push_str(r#"{ "a": true, "b": null, "c":3.1415, "d": "Hello world", "e": \
-                            [1,2,3]},"#);
-        }
-        src.push_str("{}]");
-        return src;
-    }
-
-    #[bench]
-    fn bench_streaming_large(b: &mut Bencher) {
-        let src = big_json();
-        b.iter( || {
-            let mut parser = Parser::new(src.chars());
-            loop {
-                match parser.next() {
-                    None => return,
-                    _ => {}
-                }
-            }
-        });
-    }
-    #[bench]
-    fn bench_large(b: &mut Bencher) {
-        let src = big_json();
-        b.iter( || { let _ = Json::from_str(&src); });
     }
 }
