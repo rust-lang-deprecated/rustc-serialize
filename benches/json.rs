@@ -3,6 +3,8 @@
 extern crate test;
 extern crate rustc_serialize;
 
+use std::string;
+use rustc_serialize::json::{Json, Parser};
 use test::Bencher;
 
 #[bench]

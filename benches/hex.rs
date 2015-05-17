@@ -4,7 +4,7 @@ extern crate test;
 extern crate rustc_serialize;
 
 use test::Bencher;
-use hex::{FromHex, ToHex};
+use rustc_serialize::hex::{FromHex, ToHex};
 
 #[bench]
 fn bench_to_hex(b: &mut Bencher) {
