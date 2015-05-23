@@ -415,8 +415,11 @@ fn test_decode_numbers() {
     assert_eq!(v, i64::MAX);
 
     let res: DecodeResult<i64> = decode("765.25252");
-    assert_eq!(res, Err(ExpectedError("Integer".to_string(),
-                                      "765.25252".to_string())));
+    match res {
+        Ok(..) => panic!("expected an error"),
+        Err(ExpectedError(ref s, _)) => assert_eq!(s, "Integer"),
+        Err(..) => panic!("expected an 'expected integer' error"),
+    }
 }
 
 #[test]
