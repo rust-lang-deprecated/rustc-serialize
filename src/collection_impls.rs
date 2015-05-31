@@ -30,7 +30,7 @@ impl<
 
 impl<T:Decodable> Decodable for LinkedList<T> {
     fn decode<D: Decoder>(d: &mut D) -> Result<LinkedList<T>, D::Error> {
-        d.read_seq(|d, len| {
+        d.read_seq(|d, len, _| {
             let mut list = LinkedList::new();
             for i in 0..len {
                 list.push_back(try!(d.read_seq_elt(i, |d| Decodable::decode(d))));
@@ -53,7 +53,7 @@ impl<T: Encodable> Encodable for VecDeque<T> {
 
 impl<T:Decodable> Decodable for VecDeque<T> {
     fn decode<D: Decoder>(d: &mut D) -> Result<VecDeque<T>, D::Error> {
-        d.read_seq(|d, len| {
+        d.read_seq(|d, len, _| {
             let mut deque: VecDeque<T> = VecDeque::new();
             for i in 0..len {
                 deque.push_back(try!(d.read_seq_elt(i, |d| Decodable::decode(d))));
@@ -85,7 +85,7 @@ impl<
     V: Decodable + PartialEq
 > Decodable for BTreeMap<K, V> {
     fn decode<D: Decoder>(d: &mut D) -> Result<BTreeMap<K, V>, D::Error> {
-        d.read_map(|d, len| {
+        d.read_map(|d, len, _| {
             let mut map = BTreeMap::new();
             for i in 0..len {
                 let key = try!(d.read_map_elt_key(i, |d| Decodable::decode(d)));
@@ -116,7 +116,7 @@ impl<
     T: Decodable + PartialEq + Ord
 > Decodable for BTreeSet<T> {
     fn decode<D: Decoder>(d: &mut D) -> Result<BTreeSet<T>, D::Error> {
-        d.read_seq(|d, len| {
+        d.read_seq(|d, len, _| {
             let mut set = BTreeSet::new();
             for i in 0..len {
                 set.insert(try!(d.read_seq_elt(i, |d| Decodable::decode(d))));
@@ -148,8 +148,8 @@ impl<K, V> Decodable for HashMap<K, V>
           V: Decodable,
 {
     fn decode<D: Decoder>(d: &mut D) -> Result<HashMap<K, V>, D::Error> {
-        d.read_map(|d, len| {
-            let mut map = HashMap::with_capacity(len);
+        d.read_map(|d, len, capacity| {
+            let mut map = HashMap::with_capacity(capacity);
             for i in 0..len {
                 let key = try!(d.read_map_elt_key(i, |d| Decodable::decode(d)));
                 let val = try!(d.read_map_elt_val(i, |d| Decodable::decode(d)));
@@ -175,8 +175,8 @@ impl<T> Encodable for HashSet<T> where T: Encodable + Hash + Eq {
 
 impl<T> Decodable for HashSet<T> where T: Decodable + Hash + Eq, {
     fn decode<D: Decoder>(d: &mut D) -> Result<HashSet<T>, D::Error> {
-        d.read_seq(|d, len| {
-            let mut set = HashSet::with_capacity(len);
+        d.read_seq(|d, len, capacity| {
+            let mut set = HashSet::with_capacity(capacity);
             for i in 0..len {
                 set.insert(try!(d.read_seq_elt(i, |d| Decodable::decode(d))));
             }

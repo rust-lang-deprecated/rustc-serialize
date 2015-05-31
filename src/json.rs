@@ -2245,7 +2245,7 @@ impl ::Decoder for Decoder {
     fn read_tuple<T, F>(&mut self, tuple_len: usize, f: F) -> DecodeResult<T> where
         F: FnOnce(&mut Decoder) -> DecodeResult<T>,
     {
-        self.read_seq(move |d, len| {
+        self.read_seq(move |d, len, _| {
             if len == tuple_len {
                 f(d)
             } else {
@@ -2289,14 +2289,14 @@ impl ::Decoder for Decoder {
     }
 
     fn read_seq<T, F>(&mut self, f: F) -> DecodeResult<T> where
-        F: FnOnce(&mut Decoder, usize) -> DecodeResult<T>,
+        F: FnOnce(&mut Decoder, usize, usize) -> DecodeResult<T>,
     {
         let array = try!(expect!(self.pop(), Array));
         let len = array.len();
         for v in array.into_iter().rev() {
             self.stack.push(v);
         }
-        f(self, len)
+        f(self, len, len)
     }
 
     fn read_seq_elt<T, F>(&mut self, _idx: usize, f: F) -> DecodeResult<T> where
@@ -2306,7 +2306,7 @@ impl ::Decoder for Decoder {
     }
 
     fn read_map<T, F>(&mut self, f: F) -> DecodeResult<T> where
-        F: FnOnce(&mut Decoder, usize) -> DecodeResult<T>,
+        F: FnOnce(&mut Decoder, usize, usize) -> DecodeResult<T>,
     {
         let obj = try!(expect!(self.pop(), Object));
         let len = obj.len();
@@ -2314,7 +2314,7 @@ impl ::Decoder for Decoder {
             self.stack.push(value);
             self.stack.push(Json::String(key));
         }
-        f(self, len)
+        f(self, len, len)
     }
 
     fn read_map_elt_key<T, F>(&mut self, _idx: usize, f: F) -> DecodeResult<T> where
