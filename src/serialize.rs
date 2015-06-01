@@ -431,14 +431,16 @@ impl<T:Decodable> Decodable for Rc<T> {
     }
 }
 
-impl<'a, T:Encodable+Clone> Encodable for Cow<'a, T> {
+impl<'a, T:Encodable + ToOwned + ?Sized> Encodable for Cow<'a, T> {
     #[inline]
     fn encode<S: Encoder>(&self, s: &mut S) -> Result<(), S::Error> {
         (**self).encode(s)
     }
 }
 
-impl<'a, T:Decodable+Clone> Decodable for Cow<'a, T> {
+impl<'a, T: ?Sized> Decodable for Cow<'a, T>
+    where T: ToOwned, T::Owned: Decodable
+{
     #[inline]
     fn decode<D: Decoder>(d: &mut D) -> Result<Cow<'static, T>, D::Error> {
         Ok(Cow::Owned(try!(Decodable::decode(d))))
