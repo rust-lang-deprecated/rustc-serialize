@@ -20,6 +20,7 @@ use std::path;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::marker::PhantomData;
+use std::borrow::Cow;
 
 pub trait Encoder {
     type Error;
@@ -427,6 +428,20 @@ impl<T:Decodable> Decodable for Rc<T> {
     #[inline]
     fn decode<D: Decoder>(d: &mut D) -> Result<Rc<T>, D::Error> {
         Ok(Rc::new(try!(Decodable::decode(d))))
+    }
+}
+
+impl<'a, T:Encodable+Clone> Encodable for Cow<'a, T> {
+    #[inline]
+    fn encode<S: Encoder>(&self, s: &mut S) -> Result<(), S::Error> {
+        (**self).encode(s)
+    }
+}
+
+impl<'a, T:Decodable+Clone> Decodable for Cow<'a, T> {
+    #[inline]
+    fn decode<D: Decoder>(d: &mut D) -> Result<Cow<'static, T>, D::Error> {
+        Ok(Cow::Owned(try!(Decodable::decode(d))))
     }
 }
 
