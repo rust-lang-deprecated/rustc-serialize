@@ -520,7 +520,8 @@ macro_rules! peel {
     ($name:ident, $($other:ident,)*) => (tuple! { $($other,)* })
 }
 
-/// Evaluates to the number of identifiers passed to it, for example: `count_idents!(a, b, c) == 3
+/// Evaluates to the number of identifiers passed to it, for example:
+/// `count_idents!(a, b, c) == 3
 macro_rules! count_idents {
     () => { 0 };
     ($_i:ident, $($rest:ident,)*) => { 1 + count_idents!($($rest,)*) }
@@ -562,62 +563,40 @@ macro_rules! tuple {
 tuple! { T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, }
 
 macro_rules! array {
-    () => ();
-    ($len:expr ; $($idx:expr),+ ) => {
-        impl<T:Decodable> Decodable for [T;$len] {
-            fn decode<D: Decoder>(d: &mut D) -> Result<[T;$len], D::Error> {
+    ($zero:expr) => ();
+    ($len:expr, $($idx:expr),*) => {
+        impl<T:Decodable> Decodable for [T; $len] {
+            fn decode<D: Decoder>(d: &mut D) -> Result<[T; $len], D::Error> {
                 d.read_seq(|d, len| {
                     if len != $len {
                         return Err(d.error("wrong array length"));
                     }
-                    Ok([$({ try!(d.read_seq_elt($idx, |d| Decodable::decode(d)))}),+])
+                    Ok([$(
+                        try!(d.read_seq_elt($len - $idx - 1,
+                                            |d| Decodable::decode(d)))
+                    ),+])
                 })
             }
         }
 
-        impl<T:Encodable> Encodable for [T;$len] {
+        impl<T:Encodable> Encodable for [T; $len] {
             fn encode<S: Encoder>(&self, s: &mut S) -> Result<(), S::Error> {
                 s.emit_seq($len, |s| {
-                    $(try!(s.emit_seq_elt($idx, |s| self[$idx].encode(s)));)+
+                    for i in 0..$len {
+                        try!(s.emit_seq_elt(i, |s| self[i].encode(s)));
+                    }
                     Ok(())
                 })
             }
         }
+        array! { $($idx),* }
     }
 }
 
-array!(1; 0);
-array!(2; 0,1);
-array!(3; 0,1,2);
-array!(4; 0,1,2,3);
-array!(5; 0,1,2,3,4);
-array!(6; 0,1,2,3,4,5);
-array!(7; 0,1,2,3,4,5,6);
-array!(8; 0,1,2,3,4,5,6,7);
-array!(9; 0,1,2,3,4,5,6,7,8);
-array!(10; 0,1,2,3,4,5,6,7,8,9);
-array!(11; 0,1,2,3,4,5,6,7,8,9,10);
-array!(12; 0,1,2,3,4,5,6,7,8,9,10,11);
-array!(13; 0,1,2,3,4,5,6,7,8,9,10,11,12);
-array!(14; 0,1,2,3,4,5,6,7,8,9,10,11,12,13);
-array!(15; 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14);
-array!(16; 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15);
-array!(17; 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16);
-array!(18; 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17);
-array!(19; 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18);
-array!(20; 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19);
-array!(21; 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20);
-array!(22; 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21);
-array!(23; 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22);
-array!(24; 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23);
-array!(25; 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24);
-array!(26; 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25);
-array!(27; 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26);
-array!(28; 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27);
-array!(29; 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28);
-array!(30; 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29);
-array!(31; 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30);
-array!(32; 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31);
+array! {
+    32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16,
+    15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0
+}
 
 impl Encodable for path::Path {
     #[cfg(unix)]
