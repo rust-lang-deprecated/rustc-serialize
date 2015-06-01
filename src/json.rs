@@ -3885,4 +3885,22 @@ mod tests {
         let r: Result<ChatEvent, _> = json::decode(serialized);
         assert!(r.unwrap_err() == EOF);
     }
+
+    #[test]
+    fn fixed_length_array() {
+        #[derive(Debug, RustcDecodable, RustcEncodable, Eq, PartialEq)]
+        struct Foo {
+            a: [u8; 1],
+            b: [i32; 2],
+            c: [u64; 3],
+        }
+        let f = Foo {
+            a: [0],
+            b: [1, 2],
+            c: [3, 4, 5],
+        };
+        let s = super::encode(&f).unwrap();
+        let d = super::decode(&s).unwrap();
+        assert_eq!(f, d);
+    }
 }
