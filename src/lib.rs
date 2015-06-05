@@ -32,6 +32,11 @@
        html_root_url = "http://doc.rust-lang.org/rustc-serialize/")]
 #![cfg_attr(test, deny(warnings))]
 #![allow(trivial_numeric_casts)]
+#![cfg_attr(rust_build, feature(staged_api))]
+#![cfg_attr(rust_build, staged_api)]
+#![cfg_attr(rust_build,
+            unstable(feature = "rustc_private",
+                     reason = "use the crates.io `rustc-serialize` library instead"))]
 
 #[cfg(test)] extern crate rand;
 
