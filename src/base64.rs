@@ -96,76 +96,95 @@ impl ToBase64 for [u8] {
             UrlSafe => URLSAFE_CHARS
         };
 
-        // In general, this Vec only needs (4/3) * self.len() memory, but
-        // addition is faster than multiplication and division.
-        let mut v = Vec::with_capacity(self.len() + self.len());
-        let mut i = 0;
-        let mut cur_length = 0;
         let len = self.len();
-        let mod_len = len % 3;
-        let cond_len = len - mod_len;
         let newline = match config.newline {
             Newline::LF => "\n",
             Newline::CRLF => "\r\n",
         };
-        while i < cond_len {
-            let (first, second, third) = (self[i], self[i + 1], self[i + 2]);
-            if let Some(line_length) = config.line_length {
-                if cur_length >= line_length {
-                    v.extend(newline.bytes());
-                    cur_length = 0;
-                }
-            }
 
-            let n = (first  as u32) << 16 |
-                    (second as u32) << 8 |
-                    (third  as u32);
-
-            // This 24-bit number gets separated into four 6-bit numbers.
-            v.push(bytes[((n >> 18) & 63) as usize]);
-            v.push(bytes[((n >> 12) & 63) as usize]);
-            v.push(bytes[((n >> 6 ) & 63) as usize]);
-            v.push(bytes[(n & 63) as usize]);
-
-            cur_length += 4;
-            i += 3;
+        // Preallocate memory.
+        let mut prealloc_len = (len + 2) / 3 * 4;
+        if let Some(line_length) = config.line_length {
+            let num_lines = (prealloc_len - 1) / line_length;
+            prealloc_len += num_lines * newline.bytes().count();
         }
 
-        if mod_len != 0 {
-            if let Some(line_length) = config.line_length {
-                if cur_length >= line_length {
-                    v.extend(newline.bytes());
+        let mut out_bytes = vec![b'='; prealloc_len];
+
+        // Deal with padding bytes
+        let mod_len = len % 3;
+
+        // Use iterators to reduce branching
+        {
+            let mut cur_length = 0;
+
+            let mut s_in = self[..len - mod_len].iter().map(|&x| x as u32);
+            let mut s_out = out_bytes.iter_mut();
+
+            // Convenient shorthand
+            let enc = |val| bytes[val as usize];
+            let mut write = |val| *s_out.next().unwrap() = val;
+
+            // Iterate though blocks of 4
+            while let (Some(first), Some(second), Some(third)) =
+                        (s_in.next(), s_in.next(), s_in.next()) {
+
+                // Line break if needed
+                if let Some(line_length) = config.line_length {
+                    if cur_length >= line_length {
+                        for b in newline.bytes() { write(b) };
+                        cur_length = 0;
+                    }
                 }
+
+                let n = first << 16 | second << 8 | third;
+
+                // This 24-bit number gets separated into four 6-bit numbers.
+                write(enc((n >> 18) & 63));
+                write(enc((n >> 12) & 63));
+                write(enc((n >> 6 ) & 63));
+                write(enc((n >> 0 ) & 63));
+
+                cur_length += 4;
+            }
+
+            // Line break only needed if padding is required
+            if mod_len != 0 {
+                if let Some(line_length) = config.line_length {
+                    if cur_length >= line_length {
+                        for b in newline.bytes() { write(b) };
+                    }
+                }
+            }
+
+            // Heh, would be cool if we knew this was exhaustive
+            // (the dream of bounded integer types)
+            match mod_len {
+                0 => (),
+                1 => {
+                    let n = (self[len-1] as u32) << 16;
+                    write(enc((n >> 18) & 63));
+                    write(enc((n >> 12) & 63));
+                }
+                2 => {
+                    let n = (self[len-2] as u32) << 16 |
+                            (self[len-1] as u32) << 8;
+                    write(enc((n >> 18) & 63));
+                    write(enc((n >> 12) & 63));
+                    write(enc((n >> 6 ) & 63));
+                }
+                _ => panic!("Algebra is broken, please alert the math police")
             }
         }
 
-        // Heh, would be cool if we knew this was exhaustive
-        // (the dream of bounded integer types)
-        match mod_len {
-            0 => (),
-            1 => {
-                let n = (self[i] as u32) << 16;
-                v.push(bytes[((n >> 18) & 63) as usize]);
-                v.push(bytes[((n >> 12) & 63) as usize]);
-                if config.pad {
-                    v.push(b'=');
-                    v.push(b'=');
-                }
+        // We get padding for "free", so only have to drop it if unwanted.
+        if !config.pad {
+            while let Some(&b'=') = out_bytes.last() {
+                out_bytes.pop();
             }
-            2 => {
-                let n = (self[i] as u32) << 16 |
-                    (self[i + 1] as u32) << 8;
-                v.push(bytes[((n >> 18) & 63) as usize]);
-                v.push(bytes[((n >> 12) & 63) as usize]);
-                v.push(bytes[((n >> 6 ) & 63) as usize]);
-                if config.pad {
-                    v.push(b'=');
-                }
-            }
-            _ => panic!("Algebra is broken, please alert the math police")
         }
 
-        unsafe { String::from_utf8_unchecked(v) }
+        unsafe { String::from_utf8_unchecked(out_bytes) }
     }
 }
 
