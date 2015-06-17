@@ -96,76 +96,95 @@ impl ToBase64 for [u8] {
             UrlSafe => URLSAFE_CHARS
         };
 
-        // In general, this Vec only needs (4/3) * self.len() memory, but
-        // addition is faster than multiplication and division.
-        let mut v = Vec::with_capacity(self.len() + self.len());
-        let mut i = 0;
-        let mut cur_length = 0;
         let len = self.len();
-        let mod_len = len % 3;
-        let cond_len = len - mod_len;
         let newline = match config.newline {
             Newline::LF => "\n",
             Newline::CRLF => "\r\n",
         };
-        while i < cond_len {
-            let (first, second, third) = (self[i], self[i + 1], self[i + 2]);
-            if let Some(line_length) = config.line_length {
-                if cur_length >= line_length {
-                    v.extend(newline.bytes());
-                    cur_length = 0;
-                }
-            }
 
-            let n = (first  as u32) << 16 |
-                    (second as u32) << 8 |
-                    (third  as u32);
-
-            // This 24-bit number gets separated into four 6-bit numbers.
-            v.push(bytes[((n >> 18) & 63) as usize]);
-            v.push(bytes[((n >> 12) & 63) as usize]);
-            v.push(bytes[((n >> 6 ) & 63) as usize]);
-            v.push(bytes[(n & 63) as usize]);
-
-            cur_length += 4;
-            i += 3;
+        // Preallocate memory.
+        let mut prealloc_len = (len + 2) / 3 * 4;
+        if let Some(line_length) = config.line_length {
+            let num_lines = (prealloc_len - 1) / line_length;
+            prealloc_len += num_lines * newline.bytes().count();
         }
 
-        if mod_len != 0 {
-            if let Some(line_length) = config.line_length {
-                if cur_length >= line_length {
-                    v.extend(newline.bytes());
+        let mut out_bytes = vec![b'='; prealloc_len];
+
+        // Deal with padding bytes
+        let mod_len = len % 3;
+
+        // Use iterators to reduce branching
+        {
+            let mut cur_length = 0;
+
+            let mut s_in = self[..len - mod_len].iter().map(|&x| x as u32);
+            let mut s_out = out_bytes.iter_mut();
+
+            // Convenient shorthand
+            let enc = |val| bytes[val as usize];
+            let mut write = |val| *s_out.next().unwrap() = val;
+
+            // Iterate though blocks of 4
+            while let (Some(first), Some(second), Some(third)) =
+                        (s_in.next(), s_in.next(), s_in.next()) {
+
+                // Line break if needed
+                if let Some(line_length) = config.line_length {
+                    if cur_length >= line_length {
+                        for b in newline.bytes() { write(b) };
+                        cur_length = 0;
+                    }
                 }
+
+                let n = first << 16 | second << 8 | third;
+
+                // This 24-bit number gets separated into four 6-bit numbers.
+                write(enc((n >> 18) & 63));
+                write(enc((n >> 12) & 63));
+                write(enc((n >> 6 ) & 63));
+                write(enc((n >> 0 ) & 63));
+
+                cur_length += 4;
+            }
+
+            // Line break only needed if padding is required
+            if mod_len != 0 {
+                if let Some(line_length) = config.line_length {
+                    if cur_length >= line_length {
+                        for b in newline.bytes() { write(b) };
+                    }
+                }
+            }
+
+            // Heh, would be cool if we knew this was exhaustive
+            // (the dream of bounded integer types)
+            match mod_len {
+                0 => (),
+                1 => {
+                    let n = (self[len-1] as u32) << 16;
+                    write(enc((n >> 18) & 63));
+                    write(enc((n >> 12) & 63));
+                }
+                2 => {
+                    let n = (self[len-2] as u32) << 16 |
+                            (self[len-1] as u32) << 8;
+                    write(enc((n >> 18) & 63));
+                    write(enc((n >> 12) & 63));
+                    write(enc((n >> 6 ) & 63));
+                }
+                _ => panic!("Algebra is broken, please alert the math police")
             }
         }
 
-        // Heh, would be cool if we knew this was exhaustive
-        // (the dream of bounded integer types)
-        match mod_len {
-            0 => (),
-            1 => {
-                let n = (self[i] as u32) << 16;
-                v.push(bytes[((n >> 18) & 63) as usize]);
-                v.push(bytes[((n >> 12) & 63) as usize]);
-                if config.pad {
-                    v.push(b'=');
-                    v.push(b'=');
-                }
+        // We get padding for "free", so only have to drop it if unwanted.
+        if !config.pad {
+            while let Some(&b'=') = out_bytes.last() {
+                out_bytes.pop();
             }
-            2 => {
-                let n = (self[i] as u32) << 16 |
-                    (self[i + 1] as u32) << 8;
-                v.push(bytes[((n >> 18) & 63) as usize]);
-                v.push(bytes[((n >> 12) & 63) as usize]);
-                v.push(bytes[((n >> 6 ) & 63) as usize]);
-                if config.pad {
-                    v.push(b'=');
-                }
-            }
-            _ => panic!("Algebra is broken, please alert the math police")
         }
 
-        unsafe { String::from_utf8_unchecked(v) }
+        unsafe { String::from_utf8_unchecked(out_bytes) }
     }
 }
 
@@ -249,22 +268,19 @@ impl FromBase64 for [u8] {
         let mut buf: u32 = 0;
         let mut modulus = 0;
 
-        let mut it = self.iter().enumerate();
-        for (idx, &byte) in it.by_ref() {
-            let val = byte as u32;
-
-            match byte {
-                b'A'...b'Z' => buf |= val - 0x41,
-                b'a'...b'z' => buf |= val - 0x47,
-                b'0'...b'9' => buf |= val + 0x04,
-                b'+' | b'-' => buf |= 0x3E,
-                b'/' | b'_' => buf |= 0x3F,
-                b'\r' | b'\n' => continue,
-                b'=' => break,
-                _ => return Err(InvalidBase64Byte(self[idx], idx)),
+        let mut it = self.iter();
+        for byte in it.by_ref() {
+            let code = DECODE_TABLE[*byte as usize];
+            if code >= SPECIAL_CODES_START {
+                match code {
+                    NEWLINE_CODE => continue,
+                    EQUALS_CODE => break,
+                    INVALID_CODE => return Err(InvalidBase64Byte(
+                            *byte, (byte as *const _ as usize) - self.as_ptr() as usize)),
+                    _ => unreachable!(),
+                }
             }
-
-            buf <<= 6;
+            buf = (buf | code as u32) << 6;
             modulus += 1;
             if modulus == 4 {
                 modulus = 0;
@@ -274,10 +290,11 @@ impl FromBase64 for [u8] {
             }
         }
 
-        for (idx, &byte) in it {
-            match byte {
+        for byte in it {
+            match *byte {
                 b'=' | b'\r' | b'\n' => continue,
-                _ => return Err(InvalidBase64Byte(self[idx], idx)),
+                _ => return Err(InvalidBase64Byte(
+                        *byte, (byte as *const _ as usize) - self.as_ptr() as usize)),
             }
         }
 
@@ -296,6 +313,51 @@ impl FromBase64 for [u8] {
         Ok(r)
     }
 }
+
+/// Base64 decoding lookup table, generated using:
+/// ```rust
+///     let mut ch = 0u8;
+///     loop {
+///         let code = match ch {
+///             b'A'...b'Z' => ch - 0x41,
+///             b'a'...b'z' => ch - 0x47,
+///             b'0'...b'9' => ch + 0x04,
+///             b'+' | b'-' => 0x3E,
+///             b'/' | b'_' => 0x3F,
+///             b'=' => 0xFE,
+///             b'\r' | b'\n' => 0xFD,
+///             _ => 0xFF,
+///         };
+///         print!("0x{:02X}, ", code);
+///         if ch % 16  == 15 { println!(""); }
+///         else if ch == 0xFF { break; }
+///         ch += 1;
+///     }
+///     println!("");
+/// }
+/// ```
+const DECODE_TABLE: [u8; 256] = [
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFD, 0xFF, 0xFF, 0xFD, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x3E, 0xFF, 0x3E, 0xFF, 0x3F,
+    0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0xFF, 0xFF, 0xFF, 0xFE, 0xFF, 0xFF,
+    0xFF, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E,
+    0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0xFF, 0xFF, 0xFF, 0xFF, 0x3F,
+    0xFF, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28,
+    0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+];
+const INVALID_CODE: u8 = 0xFF;
+const EQUALS_CODE: u8 = 0xFE;
+const NEWLINE_CODE: u8 = 0xFD;
+const SPECIAL_CODES_START: u8 = NEWLINE_CODE;
 
 #[cfg(test)]
 mod tests {
