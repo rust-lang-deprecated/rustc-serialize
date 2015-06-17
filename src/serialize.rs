@@ -574,7 +574,7 @@ macro_rules! array {
     ($len:expr, $($idx:expr),*) => {
         impl<T:Decodable> Decodable for [T; $len] {
             fn decode<D: Decoder>(d: &mut D) -> Result<[T; $len], D::Error> {
-                d.read_seq(|d, len| {
+                d.read_seq(|d, len, _capacity| {
                     if len != $len {
                         return Err(d.error("wrong array length"));
                     }
