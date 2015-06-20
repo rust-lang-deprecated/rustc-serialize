@@ -149,7 +149,7 @@ impl<K, V> Decodable for HashMap<K, V>
 {
     fn decode<D: Decoder>(d: &mut D) -> Result<HashMap<K, V>, D::Error> {
         d.read_map(|d, len| {
-            let mut map = HashMap::with_capacity(len);
+            let mut map = HashMap::new();
             for i in 0..len {
                 let key = try!(d.read_map_elt_key(i, |d| Decodable::decode(d)));
                 let val = try!(d.read_map_elt_val(i, |d| Decodable::decode(d)));
@@ -176,7 +176,7 @@ impl<T> Encodable for HashSet<T> where T: Encodable + Hash + Eq {
 impl<T> Decodable for HashSet<T> where T: Decodable + Hash + Eq, {
     fn decode<D: Decoder>(d: &mut D) -> Result<HashSet<T>, D::Error> {
         d.read_seq(|d, len| {
-            let mut set = HashSet::with_capacity(len);
+            let mut set = HashSet::new();
             for i in 0..len {
                 set.insert(try!(d.read_seq_elt(i, |d| Decodable::decode(d))));
             }
