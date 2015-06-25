@@ -231,9 +231,10 @@
 //! # The status of this library
 //!
 //! While this library is the standard way of working with JSON in Rust,
-//! there is a next-generation library called Serde that's in the works
-//! (it's faster, overcomes some design limitations of rustc-serialize and has more features).
-//! You might consider using it when starting new project or evaluating Rust JSON performance.
+//! there is a next-generation library called Serde that's in the works (it's
+//! faster, overcomes some design limitations of rustc-serialize and has more
+//! features).  You might consider using it when starting new project or
+//! evaluating Rust JSON performance.
 //!
 //! ```
 
