@@ -321,10 +321,14 @@ impl PartialEq for ParserError {
     }
 }
 
+/// Parser result
 pub type ParserResult<T> = Result<T, io::CharsError>;
 
 // Builder and Parser have the same errors.
 pub type BuilderError = ParserError;
+
+// Builder and Parser have the same result.
+pub type BuilderResult<T> = ParserResult<T>;
 
 #[derive(PartialEq, Debug)]
 pub enum DecoderError {
@@ -1968,14 +1972,13 @@ pub struct Builder<T: Iterator<Item=ParserResult<char>>> {
 
 impl<T: Iterator<Item=ParserResult<char>>> Builder<T> {
     /// Create a JSON Builder.
-    pub fn new(src: T) -> ParserResult<Builder<T>> {
+    pub fn new(src: T) -> BuilderResult<Builder<T>> {
         Ok(Builder { parser: try!(Parser::new(src)), token: None, })
     }
 
     // Decode a Json value from a Parser.
     pub fn build(&mut self) -> Result<Json, BuilderError> {
-        try!(self.bump());
-        let result = self.build_value();
+        let result = self.next();
         try!(self.bump());
         match self.token.take() {
             None => {}
@@ -1983,6 +1986,11 @@ impl<T: Iterator<Item=ParserResult<char>>> Builder<T> {
             ref tok => { panic!("unexpected token {:?}", tok); }
         }
         result
+    }
+
+    fn next(&mut self) -> Result<Json, BuilderError> {
+        try!(self.bump());
+        self.build_value()
     }
 
     fn bump(&mut self) -> ParserResult<()> {
@@ -2054,6 +2062,31 @@ impl<T: Iterator<Item=ParserResult<char>>> Builder<T> {
             try!(self.bump());
         }
         return self.parser.error(EOFWhileParsingObject);
+    }
+}
+
+// Reader should have the same error as Builder
+pub type ReaderError = BuilderError;
+
+// Reader should have the same result as Builder
+pub type ReaderResult<T> = BuilderResult<T>;
+
+/// A Builder consumes a json::Parser to create a generic Json structure.
+pub struct Reader<R: Read> {
+    builder: Builder<io::Chars<R>>,
+}
+
+impl<R: Read> Reader<R> {
+    /// Create a JSON Reader.
+    pub fn new(src: R) -> ReaderResult<Reader<R>> {
+        Ok(Reader {
+            builder: try!(Builder::new(src.chars())),
+        })
+    }
+
+    // Decode a Json value from a Parser.
+    pub fn next(&mut self) -> Result<Json, ReaderError> {
+        self.builder.next()
     }
 }
 
