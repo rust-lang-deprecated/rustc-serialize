@@ -305,7 +305,6 @@ pub enum ParserError {
     /// msg, line, col
     SyntaxError(ErrorCode, usize, usize),
     IoError(io::Error),
-    NotUtf8Char,
 }
 
 impl PartialEq for ParserError {
@@ -315,8 +314,6 @@ impl PartialEq for ParserError {
                 msg0 == msg1 && line0 == line1 && col0 == col1,
             (&IoError(_), _) => false,
             (_, &IoError(_)) => false,
-            (&NotUtf8Char, &NotUtf8Char) => true,
-            _ => false,
         }
     }
 }
@@ -340,14 +337,11 @@ pub enum DecoderError {
     EOF,
 }
 
-#[derive(Copy, Debug)]
+#[derive(Debug)]
 pub enum EncoderError {
     FmtError(fmt::Error),
+    IoError(io::Error),
     BadHashmapKey,
-}
-
-impl Clone for EncoderError {
-    fn clone(&self) -> Self { *self }
 }
 
 /// Returns a readable error string for a given error code.
@@ -385,14 +379,24 @@ pub fn decode<T: ::Decodable>(s: &str) -> DecodeResult<T> {
     ::Decodable::decode(&mut decoder)
 }
 
+pub fn decode_bytes<T: ::Decodable>(bytes: &[u8]) -> DecodeResult<T> {
+    let json = match Json::from_bytes(bytes) {
+        Ok(x) => x,
+        Err(e) => return Err(ParseError(e))
+    };
+
+    let mut decoder = Decoder::new(json);
+    ::Decodable::decode(&mut decoder)
+}
+
 /// Shortcut function to encode a `T` into a JSON `String`
 pub fn encode<T: ::Encodable>(object: &T) -> EncodeResult<string::String> {
-    let mut s = String::new();
+    let mut buf = Vec::new();
     {
-        let mut encoder = Encoder::new(&mut s);
+        let mut encoder = Encoder::new(&mut buf);
         try!(object.encode(&mut encoder));
     }
-    Ok(s)
+    Ok(unsafe { string::String::from_utf8_unchecked(buf) })
 }
 
 impl fmt::Debug for ErrorCode {
@@ -443,7 +447,7 @@ impl From<io::CharsError> for ParserError {
     fn from(err: io::CharsError) -> ParserError {
         match err {
             io::CharsError::Other(err) => IoError(err),
-            io::CharsError::NotUtf8 => NotUtf8Char,
+            io::CharsError::NotUtf8 => SyntaxError(NotUtf8, 0, 0),
         }
     }
 }
@@ -462,11 +466,15 @@ impl From<fmt::Error> for EncoderError {
     fn from(err: fmt::Error) -> EncoderError { EncoderError::FmtError(err) }
 }
 
+impl From<io::Error> for EncoderError {
+    fn from(err: io::Error) -> EncoderError { EncoderError::IoError(err) }
+}
+
 pub type EncodeResult<T> = Result<T, EncoderError>;
 pub type DecodeResult<T> = Result<T, DecoderError>;
 
-fn escape_str(wr: &mut fmt::Write, v: &str) -> EncodeResult<()> {
-    try!(wr.write_str("\""));
+fn escape_str(wr: &mut io::Write, v: &str) -> EncodeResult<()> {
+    try!(wr.write_all(b"\""));
 
     let mut start = 0;
 
@@ -511,40 +519,40 @@ fn escape_str(wr: &mut fmt::Write, v: &str) -> EncodeResult<()> {
         };
 
         if start < i {
-            try!(wr.write_str(&v[start..i]));
+            try!(wr.write_all(v[start..i].as_bytes()));
         }
 
-        try!(wr.write_str(escaped));
+        try!(wr.write_all(escaped.as_bytes()));
 
         start = i + 1;
     }
 
     if start != v.len() {
-        try!(wr.write_str(&v[start..]));
+        try!(wr.write_all(v[start..].as_bytes()));
     }
 
-    try!(wr.write_str("\""));
+    try!(wr.write_all(b"\""));
     Ok(())
 }
 
-fn escape_char(writer: &mut fmt::Write, v: char) -> EncodeResult<()> {
+fn escape_char(writer: &mut io::Write, v: char) -> EncodeResult<()> {
     let mut buf = [0; 4];
     let _ = write!(&mut &mut buf[..], "{}", v);
     let buf = unsafe { str::from_utf8_unchecked(&buf[..v.len_utf8()]) };
     escape_str(writer, buf)
 }
 
-fn spaces(wr: &mut fmt::Write, n: u32) -> EncodeResult<()> {
+fn spaces(wr: &mut io::Write, n: u32) -> EncodeResult<()> {
     let mut n = n as usize;
     const BUF: &'static str = "                ";
 
     while n >= BUF.len() {
-        try!(wr.write_str(BUF));
+        try!(wr.write_all(BUF.as_bytes()));
         n -= BUF.len();
     }
 
     if n > 0 {
-        try!(wr.write_str(&BUF[..n]));
+        try!(wr.write_all(BUF[..n].as_bytes()));
     }
     Ok(())
 }
@@ -583,7 +591,7 @@ enum EncodingFormat {
 
 /// A structure for implementing serialization to JSON.
 pub struct Encoder<'a> {
-    writer: &'a mut (fmt::Write+'a),
+    writer: &'a mut (io::Write+'a),
     format : EncodingFormat,
     is_emitting_map_key: bool,
 }
@@ -591,7 +599,7 @@ pub struct Encoder<'a> {
 impl<'a> Encoder<'a> {
     /// Creates a new encoder whose output will be written in human-readable
     /// JSON to the specified writer
-    pub fn new_pretty(writer: &'a mut fmt::Write) -> Encoder<'a> {
+    pub fn new_pretty(writer: &'a mut io::Write) -> Encoder<'a> {
         Encoder {
             writer: writer,
             format: EncodingFormat::Pretty {
@@ -604,7 +612,7 @@ impl<'a> Encoder<'a> {
 
     /// Creates a new encoder whose output will be written in compact
     /// JSON to the specified writer
-    pub fn new(writer: &'a mut fmt::Write) -> Encoder<'a> {
+    pub fn new(writer: &'a mut io::Write) -> Encoder<'a> {
         Encoder {
             writer: writer,
             format: EncodingFormat::Compact,
@@ -981,6 +989,12 @@ impl Json {
     /// Decodes a json value from a string
     pub fn from_str(s: &str) -> Result<Self, BuilderError> {
         let mut builder = try!(Builder::new(s.chars().map(|c| Ok(c))));
+        builder.build()
+    }
+
+    pub fn from_bytes(buf: &[u8]) -> Result<Self, BuilderError> {
+        let buf = io::Cursor::new(buf);
+        let mut builder = try!(Builder::new(buf.chars()));
         builder.build()
     }
 
@@ -2571,6 +2585,19 @@ impl<'a, 'b> fmt::Write for FormatShim<'a, 'b> {
     }
 }
 
+impl<'a, 'b> io::Write for FormatShim<'a, 'b> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match <FormatShim as fmt::Write>::write_str(self, unsafe { str::from_utf8_unchecked(buf) }) {
+            Ok(..) => Ok(buf.len()),
+            Err(..) => Err(io::Error::new(io::ErrorKind::Other, "fmt Error")),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
 impl fmt::Display for Json {
     /// Encodes a json value into a string
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -3962,7 +3989,7 @@ mod tests {
         struct ArbitraryType(u32);
         let mut hm: HashMap<ArbitraryType, bool> = HashMap::new();
         hm.insert(ArbitraryType(1), true);
-        let mut mem_buf = string::String::new();
+        let mut mem_buf = Vec::new();
         let mut encoder = Encoder::new(&mut mem_buf);
         let result = hm.encode(&mut encoder);
         match result.err().unwrap() {
