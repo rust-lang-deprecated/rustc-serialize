@@ -305,6 +305,7 @@ pub enum ParserError {
     /// msg, line, col
     SyntaxError(ErrorCode, usize, usize),
     IoError(io::Error),
+    NotUtf8Char,
 }
 
 impl PartialEq for ParserError {
@@ -314,9 +315,13 @@ impl PartialEq for ParserError {
                 msg0 == msg1 && line0 == line1 && col0 == col1,
             (&IoError(_), _) => false,
             (_, &IoError(_)) => false,
+            (&NotUtf8Char, &NotUtf8Char) => true,
+            _ => false,
         }
     }
 }
+
+pub type ParserResult<T> = Result<T, io::CharsError>;
 
 // Builder and Parser have the same errors.
 pub type BuilderError = ParserError;
@@ -427,6 +432,15 @@ impl fmt::Display for ParserError {
 impl From<io::Error> for ParserError {
     fn from(err: io::Error) -> ParserError {
         IoError(err)
+    }
+}
+
+impl From<io::CharsError> for ParserError {
+    fn from(err: io::CharsError) -> ParserError {
+        match err {
+            io::CharsError::Other(err) => IoError(err),
+            io::CharsError::NotUtf8 => NotUtf8Char,
+        }
     }
 }
 
@@ -1364,7 +1378,7 @@ impl Stack {
 
 /// A streaming JSON parser implemented as an iterator of JsonEvent, consuming
 /// an iterator of char.
-pub struct Parser<T: Iterator<Item=io::Result<char>>> {
+pub struct Parser<T: Iterator<Item=ParserResult<char>>> {
     rdr: T,
     ch: Option<char>,
     line: usize,
@@ -1376,10 +1390,10 @@ pub struct Parser<T: Iterator<Item=io::Result<char>>> {
     state: ParserState,
 }
 
-impl<T: Iterator<Item=io::Result<char>>> Iterator for Parser<T> {
-    type Item = io::Result<JsonEvent>;
+impl<T: Iterator<Item=ParserResult<char>>> Iterator for Parser<T> {
+    type Item = ParserResult<JsonEvent>;
 
-    fn next(&mut self) -> Option<io::Result<JsonEvent>> {
+    fn next(&mut self) -> Option<ParserResult<JsonEvent>> {
         if self.state == ParseFinished {
             return None;
         }
@@ -1402,9 +1416,9 @@ impl<T: Iterator<Item=io::Result<char>>> Iterator for Parser<T> {
     }
 }
 
-impl<T: Iterator<Item=io::Result<char>>> Parser<T> {
+impl<T: Iterator<Item=ParserResult<char>>> Parser<T> {
     /// Creates the JSON parser.
-    pub fn new(rdr: T) -> io::Result<Parser<T>> {
+    pub fn new(rdr: T) -> ParserResult<Parser<T>> {
         let mut p = Parser {
             rdr: rdr,
             ch: Some('\x00'),
@@ -1428,7 +1442,7 @@ impl<T: Iterator<Item=io::Result<char>>> Parser<T> {
 
     fn eof(&self) -> bool { self.ch.is_none() }
     fn ch_or_null(&self) -> char { self.ch.unwrap_or('\x00') }
-    fn bump(&mut self) -> io::Result<()> {
+    fn bump(&mut self) -> ParserResult<()> {
         self.ch = match self.rdr.next() {
             Some(c) => Some(try!(c)),
             None => None,
@@ -1444,7 +1458,7 @@ impl<T: Iterator<Item=io::Result<char>>> Parser<T> {
         Ok(())
     }
 
-    fn next_char(&mut self) -> io::Result<Option<char>> {
+    fn next_char(&mut self) -> ParserResult<Option<char>> {
         match self.bump() {
             Ok(..) => Ok(self.ch),
             Err(err) => Err(err),
@@ -1458,7 +1472,7 @@ impl<T: Iterator<Item=io::Result<char>>> Parser<T> {
         Err(SyntaxError(reason, self.line, self.col))
     }
 
-    fn parse_whitespace(&mut self) -> io::Result<()> {
+    fn parse_whitespace(&mut self) -> ParserResult<()> {
         while self.ch_is(' ') ||
               self.ch_is('\n') ||
               self.ch_is('\t') ||
@@ -1467,7 +1481,7 @@ impl<T: Iterator<Item=io::Result<char>>> Parser<T> {
         Ok(())
     }
 
-    fn parse_number(&mut self) -> io::Result<JsonEvent> {
+    fn parse_number(&mut self) -> ParserResult<JsonEvent> {
         let mut neg = false;
 
         if self.ch_is('-') {
@@ -1518,7 +1532,7 @@ impl<T: Iterator<Item=io::Result<char>>> Parser<T> {
         }
     }
 
-    fn parse_u64(&mut self) -> io::Result<Result<u64, ParserError>> {
+    fn parse_u64(&mut self) -> ParserResult<Result<u64, ParserError>> {
         let mut accum: u64 = 0;
 
         match self.ch_or_null() {
@@ -1558,7 +1572,7 @@ impl<T: Iterator<Item=io::Result<char>>> Parser<T> {
         Ok(Ok(accum))
     }
 
-    fn parse_decimal(&mut self, mut res: f64) -> io::Result<Result<f64, ParserError>> {
+    fn parse_decimal(&mut self, mut res: f64) -> ParserResult<Result<f64, ParserError>> {
         try!(self.bump());
 
         // Make sure a digit follows the decimal place.
@@ -1582,7 +1596,7 @@ impl<T: Iterator<Item=io::Result<char>>> Parser<T> {
         Ok(Ok(res))
     }
 
-    fn parse_exponent(&mut self, mut res: f64) -> io::Result<Result<f64, ParserError>> {
+    fn parse_exponent(&mut self, mut res: f64) -> ParserResult<Result<f64, ParserError>> {
         try!(self.bump());
 
         let mut exp = 0;
@@ -1622,7 +1636,7 @@ impl<T: Iterator<Item=io::Result<char>>> Parser<T> {
         Ok(Ok(res))
     }
 
-    fn decode_hex_escape(&mut self) -> io::Result<Result<u16, ParserError>> {
+    fn decode_hex_escape(&mut self) -> ParserResult<Result<u16, ParserError>> {
         let mut i = 0;
         let mut n = 0;
         while i < 4 {
@@ -1640,7 +1654,7 @@ impl<T: Iterator<Item=io::Result<char>>> Parser<T> {
         Ok(Ok(n))
     }
 
-    fn parse_str(&mut self) -> io::Result<Result<string::String, ParserError>> {
+    fn parse_str(&mut self) -> ParserResult<Result<string::String, ParserError>> {
         let mut escape = false;
         let mut res = string::String::new();
 
@@ -1722,7 +1736,7 @@ impl<T: Iterator<Item=io::Result<char>>> Parser<T> {
     // Also keeps track of the position in the logical structure of the json
     // stream int the form of a stack that can be queried by the user using the
     // stack() method.
-    fn parse(&mut self) -> io::Result<JsonEvent> {
+    fn parse(&mut self) -> ParserResult<JsonEvent> {
         loop {
             // The only paths where the loop can spin a new iteration
             // are in the cases ParseArrayComma and ParseObjectComma if ','
@@ -1764,7 +1778,7 @@ impl<T: Iterator<Item=io::Result<char>>> Parser<T> {
         }
     }
 
-    fn parse_start(&mut self) -> io::Result<JsonEvent> {
+    fn parse_start(&mut self) -> ParserResult<JsonEvent> {
         let val = try!(self.parse_value());
         self.state = match val {
             Error(_) => ParseFinished,
@@ -1775,7 +1789,7 @@ impl<T: Iterator<Item=io::Result<char>>> Parser<T> {
         return Ok(val);
     }
 
-    fn parse_array(&mut self, first: bool) -> io::Result<JsonEvent> {
+    fn parse_array(&mut self, first: bool) -> ParserResult<JsonEvent> {
         let arr =
             if self.ch_is(']') {
                 if !first {
@@ -1807,7 +1821,7 @@ impl<T: Iterator<Item=io::Result<char>>> Parser<T> {
         Ok(arr)
     }
 
-    fn parse_array_comma_or_end(&mut self) -> io::Result<Option<JsonEvent>> {
+    fn parse_array_comma_or_end(&mut self) -> ParserResult<Option<JsonEvent>> {
         let comma =
             if self.ch_is(',') {
                 self.stack.bump_index();
@@ -1833,7 +1847,7 @@ impl<T: Iterator<Item=io::Result<char>>> Parser<T> {
         Ok(comma)
     }
 
-    fn parse_object(&mut self, first: bool) -> io::Result<JsonEvent> {
+    fn parse_object(&mut self, first: bool) -> ParserResult<JsonEvent> {
         if self.ch_is('}') {
             if !first {
                 if self.stack.is_empty() {
@@ -1886,7 +1900,7 @@ impl<T: Iterator<Item=io::Result<char>>> Parser<T> {
         return Ok(val);
     }
 
-    fn parse_object_end(&mut self) -> io::Result<JsonEvent> {
+    fn parse_object_end(&mut self) -> ParserResult<JsonEvent> {
         let obj_end =
             if self.ch_is('}') {
                 self.state = if self.stack.is_empty() {
@@ -1906,7 +1920,7 @@ impl<T: Iterator<Item=io::Result<char>>> Parser<T> {
         Ok(obj_end)
     }
 
-    fn parse_value(&mut self) -> io::Result<JsonEvent> {
+    fn parse_value(&mut self) -> ParserResult<JsonEvent> {
         if self.eof() { return Ok(self.error_event(EOFWhileParsingValue)); }
         match self.ch_or_null() {
             'n' => { self.parse_ident("ull", NullValue) }
@@ -1929,7 +1943,7 @@ impl<T: Iterator<Item=io::Result<char>>> Parser<T> {
         }
     }
 
-    fn parse_ident(&mut self, ident: &str, value: JsonEvent) -> io::Result<JsonEvent> {
+    fn parse_ident(&mut self, ident: &str, value: JsonEvent) -> ParserResult<JsonEvent> {
         for c in ident.chars() {
             if Some(c) != try!(self.next_char()) {
                 return Ok(Error(SyntaxError(InvalidSyntax, self.line, self.col)));
@@ -1947,14 +1961,14 @@ impl<T: Iterator<Item=io::Result<char>>> Parser<T> {
 }
 
 /// A Builder consumes a json::Parser to create a generic Json structure.
-pub struct Builder<T: Iterator<Item=io::Result<char>>> {
+pub struct Builder<T: Iterator<Item=ParserResult<char>>> {
     parser: Parser<T>,
     token: Option<JsonEvent>,
 }
 
-impl<T: Iterator<Item=io::Result<char>>> Builder<T> {
+impl<T: Iterator<Item=ParserResult<char>>> Builder<T> {
     /// Create a JSON Builder.
-    pub fn new(src: T) -> io::Result<Builder<T>> {
+    pub fn new(src: T) -> ParserResult<Builder<T>> {
         Ok(Builder { parser: try!(Parser::new(src)), token: None, })
     }
 
@@ -1971,7 +1985,7 @@ impl<T: Iterator<Item=io::Result<char>>> Builder<T> {
         result
     }
 
-    fn bump(&mut self) -> io::Result<()> {
+    fn bump(&mut self) -> ParserResult<()> {
         self.token = match self.parser.next() {
             Some(t) => Some(try!(t)),
             None => None,

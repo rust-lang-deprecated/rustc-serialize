@@ -38,6 +38,8 @@
             unstable(feature = "rustc_private",
                      reason = "use the crates.io `rustc-serialize` library instead"))]
 
+#![feature(io)]
+
 #[cfg(test)] extern crate rand;
 
 pub use self::serialize::{Decoder, Encoder, Decodable, Encodable,
