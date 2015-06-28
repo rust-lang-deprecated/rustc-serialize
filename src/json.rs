@@ -973,17 +973,8 @@ pub fn as_pretty_json<T: Encodable>(t: &T) -> AsPrettyJson<T> {
 impl Json {
     /// Decodes a json value from an `&mut io::Read`
     pub fn from_reader(rdr: &mut io::Read) -> Result<Self, BuilderError> {
-        let contents = {
-            let mut c = Vec::new();
-            try!(rdr.read_to_end(&mut c));
-            c
-        };
-        let s = match str::from_utf8(&contents).ok() {
-            Some(s) => s,
-            _       => return Err(SyntaxError(NotUtf8, 0, 0))
-        };
-        let mut builder = try!(Builder::new(s.chars().map(|c| Ok(c))));
-        builder.build()
+        let mut rdr = try!(Reader::new(rdr));
+        rdr.next()
     }
 
     /// Decodes a json value from a string
