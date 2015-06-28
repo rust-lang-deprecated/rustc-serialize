@@ -1228,6 +1228,7 @@ pub enum JsonEvent {
     F64Value(f64),
     StringValue(string::String),
     NullValue,
+    StreamEnd,
     Error(ParserError),
 }
 
@@ -1757,6 +1758,10 @@ impl<T: Iterator<Item=ParserResult<char>>> Parser<T> {
             // All other paths return before the end of the loop's iteration.
             try!(self.parse_whitespace());
 
+            if self.eof() {
+                return Ok(JsonEvent::StreamEnd);
+            }
+
             match self.state {
                 ParseStart => {
                     return self.parse_start();
@@ -2004,7 +2009,7 @@ impl<T: Iterator<Item=ParserResult<char>>> Builder<T> {
             Err(err) => return Some(Err(From::from(err)))
         }
 
-        if self.token.is_none() {
+        if let Some(StreamEnd) = self.token {
             // EOF
             None
         } else {
@@ -2038,6 +2043,7 @@ impl<T: Iterator<Item=ParserResult<char>>> Builder<T> {
             Some(ObjectStart) => self.build_object(),
             Some(ObjectEnd) => self.parser.error(InvalidSyntax),
             Some(ArrayEnd) => self.parser.error(InvalidSyntax),
+            Some(StreamEnd) => self.parser.error(EOFWhileParsingValue),
             None => self.parser.error(EOFWhileParsingValue),
         }
     }
