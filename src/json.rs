@@ -972,9 +972,11 @@ pub fn as_pretty_json<T: Encodable>(t: &T) -> AsPrettyJson<T> {
 
 impl Json {
     /// Decodes a json value from an `&mut io::Read`
-    pub fn from_reader(rdr: &mut io::Read) -> Result<Self, BuilderError> {
-        let mut rdr = try!(Reader::new(rdr));
-        rdr.next()
+    pub fn from_reader(rdr: &mut io::Read) -> Option<Result<Self, ReaderError>> {
+        match Reader::new(rdr) {
+            Ok(mut r) => r.next(),
+            Err(err) => Some(Err(From::from(err))),
+        }
     }
 
     /// Decodes a json value from a string
@@ -1983,7 +1985,10 @@ impl<T: Iterator<Item=ParserResult<char>>> Builder<T> {
 
     // Decode a Json value from a Parser.
     pub fn build(&mut self) -> Result<Json, BuilderError> {
-        let result = self.next();
+        let result = match self.next() {
+            Some(r) => r,
+            None => return self.parser.error(EOFWhileParsingValue),
+        };
         try!(self.bump());
         match self.token.take() {
             None => {}
@@ -1993,9 +1998,18 @@ impl<T: Iterator<Item=ParserResult<char>>> Builder<T> {
         result
     }
 
-    fn next(&mut self) -> Result<Json, BuilderError> {
-        try!(self.bump());
-        self.build_value()
+    fn next(&mut self) -> Option<Result<Json, BuilderError>> {
+        match self.bump() {
+            Ok(..) => {},
+            Err(err) => return Some(Err(From::from(err)))
+        }
+
+        if self.token.is_none() {
+            // EOF
+            None
+        } else {
+            Some(self.build_value())
+        }
     }
 
     fn bump(&mut self) -> ParserResult<()> {
@@ -2088,9 +2102,14 @@ impl<R: Read> Reader<R> {
             builder: try!(Builder::new(src.chars())),
         })
     }
+}
 
+impl<R: Read> Iterator for Reader<R> {
+    type Item = Result<Json, ReaderError>;
+
+    #[inline]
     // Decode a Json value from a Parser.
-    pub fn next(&mut self) -> Result<Json, ReaderError> {
+    fn next(&mut self) -> Option<Result<Json, ReaderError>> {
         self.builder.next()
     }
 }
