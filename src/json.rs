@@ -3883,6 +3883,23 @@ mod tests {
     }
 
     #[test]
+    fn test_encode_decode_phantom_data() {
+        use std::marker::PhantomData;
+
+        #[derive(Debug, RustcDecodable, RustcEncodable, Eq, PartialEq)]
+        struct Foo<P> {
+            phantom_data: PhantomData<P>
+        }
+        
+        let f: Foo<u8> = Foo {
+            phantom_data: PhantomData
+        };
+        let s = super::encode(&f).unwrap();
+        let d: Foo<u8> = super::decode(&s).unwrap();
+        assert_eq!(f, d);
+    }
+
+    #[test]
     fn test_bad_json_stack_depleted() {
         use json;
         #[derive(Debug, RustcDecodable)]

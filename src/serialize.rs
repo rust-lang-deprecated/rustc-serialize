@@ -512,8 +512,8 @@ impl<T:Decodable> Decodable for Option<T> {
 }
 
 impl<T> Encodable for PhantomData<T> {
-    fn encode<S: Encoder>(&self, _s: &mut S) -> Result<(), S::Error> {
-        Ok(())
+    fn encode<S: Encoder>(&self, s: &mut S) -> Result<(), S::Error> {
+        s.emit_nil()
     }
 }
 
