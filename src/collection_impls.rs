@@ -64,8 +64,8 @@ impl<T:Decodable> Decodable for VecDeque<T> {
 }
 
 impl<
-    K: Encodable + PartialEq + Ord,
-    V: Encodable + PartialEq
+    K: Encodable + Ord,
+    V: Encodable
 > Encodable for BTreeMap<K, V> {
     fn encode<S: Encoder>(&self, e: &mut S) -> Result<(), S::Error> {
         e.emit_map(self.len(), |e| {
@@ -81,8 +81,8 @@ impl<
 }
 
 impl<
-    K: Decodable + PartialEq + Ord,
-    V: Decodable + PartialEq
+    K: Decodable + Ord,
+    V: Decodable
 > Decodable for BTreeMap<K, V> {
     fn decode<D: Decoder>(d: &mut D) -> Result<BTreeMap<K, V>, D::Error> {
         d.read_map(|d, len| {
@@ -98,7 +98,7 @@ impl<
 }
 
 impl<
-    T: Encodable + PartialEq + Ord
+    T: Encodable + Ord
 > Encodable for BTreeSet<T> {
     fn encode<S: Encoder>(&self, s: &mut S) -> Result<(), S::Error> {
         s.emit_seq(self.len(), |s| {
@@ -113,7 +113,7 @@ impl<
 }
 
 impl<
-    T: Decodable + PartialEq + Ord
+    T: Decodable + Ord
 > Decodable for BTreeSet<T> {
     fn decode<D: Decoder>(d: &mut D) -> Result<BTreeSet<T>, D::Error> {
         d.read_seq(|d, len| {
