@@ -6,7 +6,7 @@ of `derive(RustcEncodable, RustcDecodable)`.
 [![Linux Build Status](https://travis-ci.org/rust-lang/rustc-serialize.svg?branch=master)](https://travis-ci.org/rust-lang/rustc-serialize)
 [![Windows Build Status](https://ci.appveyor.com/api/projects/status/ka194de75aapwpft?svg=true)](https://ci.appveyor.com/project/alexcrichton/rustc-serialize)
 
-[Documentation](http://doc.rust-lang.org/rustc-serialize)
+[Documentation](https://doc.rust-lang.org/rustc-serialize)
 
 ## Usage
 
