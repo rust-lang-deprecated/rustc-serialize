@@ -3890,7 +3890,7 @@ mod tests {
         struct Foo<P> {
             phantom_data: PhantomData<P>
         }
-        
+
         let f: Foo<u8> = Foo {
             phantom_data: PhantomData
         };
