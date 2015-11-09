@@ -16,8 +16,8 @@
 //! # What is JSON?
 //!
 //! JSON (JavaScript Object Notation) is a way to write data in Javascript.
-//! Like XML, it allows to encode structured data in a text format that can be
-//! easily read by humans Its simple syntax and native compatibility with
+//! Like XML, it allows encoding structured data in a text format that can be
+//! easily read by humans. Its simple syntax and native compatibility with
 //! JavaScript have made it a widely used format.
 //!
 //! Data types that can be encoded are JavaScript types (see the `Json` enum
@@ -72,7 +72,7 @@
 //! string or buffer using the functions described above.  You can also use the
 //! `json::Encoder` object, which implements the `Encoder` trait.
 //!
-//! When using `ToJson` the `Encodable` trait implementation is not
+//! When using `ToJson`, the `Encodable` trait implementation is not
 //! mandatory.
 //!
 //! # Examples of use
@@ -112,7 +112,7 @@
 //!
 //! ## Using the `ToJson` trait
 //!
-//! The examples above use the `ToJson` trait to generate the JSON string,
+//! The examples below use the `ToJson` trait to generate the JSON string,
 //! which is required for custom mappings.
 //!
 //! ### Simple example of `ToJson` usage
@@ -234,7 +234,7 @@
 //! While this library is the standard way of working with JSON in Rust,
 //! there is a next-generation library called Serde that's in the works (it's
 //! faster, overcomes some design limitations of rustc-serialize and has more
-//! features). You might consider using it when starting new project or
+//! features). You might consider using it when starting a new project or
 //! evaluating Rust JSON performance.
 
 use self::JsonEvent::*;
