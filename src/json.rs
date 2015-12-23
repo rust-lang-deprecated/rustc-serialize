@@ -2555,7 +2555,6 @@ impl FromStr for Json {
 #[cfg(test)]
 mod tests {
     use self::Animal::*;
-    use self::DecodeEnum::*;
     use {Encodable, Decodable};
     use super::Json::*;
     use super::ErrorCode::*;
