@@ -19,7 +19,7 @@ use std::fmt;
 use std::error;
 
 /// Available encoding character sets
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum CharacterSet {
     /// The standard character set (uses `+` and `/`)
     Standard,
@@ -28,7 +28,7 @@ pub enum CharacterSet {
 }
 
 /// Available newline types
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Newline {
     /// A linefeed (i.e. Unix-style newline)
     LF,
@@ -37,7 +37,7 @@ pub enum Newline {
 }
 
 /// Contains configuration parameters for `to_base64`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Config {
     /// Character set to use
     pub char_set: CharacterSet,
