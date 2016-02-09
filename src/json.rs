@@ -3927,4 +3927,128 @@ mod tests {
         let d = super::decode(&s).unwrap();
         assert_eq!(f, d);
     }
+
+    mod path {
+        use std::path::PathBuf;
+        use std::ffi::OsString;
+
+        pub fn dec_utf8_no_escape() -> PathBuf {
+            PathBuf::from("test/äß/foo")
+        }
+
+        pub fn dec_utf8_escape() -> PathBuf {
+            PathBuf::from("test/äß/foo/%")
+        }
+
+        pub fn dec_non_unicode() -> PathBuf {
+            #[cfg(unix)]
+            fn _dec_non_unicode() -> OsString {
+                use std::os::unix::prelude::*;
+
+                // first utf8 byte of "ä", and the always invalid 0xff.
+                let bytes = vec![195, 0xff];
+                OsStringExt::from_vec(bytes)
+            }
+            #[cfg(windows)]
+            fn _dec_non_unicode() -> OsString {
+                use std::os::windows::prelude::*;
+
+                // first surrogate of "pile of poo",
+                // valid 'ä',
+                // surrogates of "pile of poo" in wrong order.
+                let u16s = vec![55357, 228, 56489, 55357];
+                OsStringExt::from_wide(&u16s)
+            }
+
+            let mut path = dec_utf8_escape();
+            path.push(_dec_non_unicode());
+            path
+        }
+
+        pub fn decoded() -> Vec<PathBuf> {
+            vec![
+                dec_utf8_no_escape(),
+                dec_utf8_escape(),
+                dec_non_unicode(),
+            ]
+        }
+
+        pub fn enc_utf8_no_escape() -> String {
+            "test/äß/foo".into()
+        }
+
+        pub fn enc_utf8_escape() -> String {
+            #[cfg(unix)]
+            const S: &'static str = "test/%00C3%00A4%00C3%009F/foo/%%";
+            #[cfg(windows)]
+            const S: &'static str = "test/%00E4%00DF/foo/%%";
+
+            S.into()
+        }
+
+        pub fn enc_non_unicode() -> String {
+            #[cfg(unix)]
+            const S: &'static str = "/%00C3%00FF";
+            #[cfg(windows)]
+            const S: &'static str = "\\\\%D83D%00E4%DCA9%D83D";
+
+            let mut s = enc_utf8_escape();
+            s.push_str(S);
+            s
+        }
+
+        pub fn encoded() -> Vec<String> {
+            [
+                enc_utf8_no_escape(),
+                enc_utf8_escape(),
+                enc_non_unicode(),
+            ].iter().map(|s| format!(r#""{}""#, s)).collect()
+        }
+    }
+
+    #[test]
+    fn encode_path() {
+        let encoded = path::encoded();
+        let decoded = path::decoded();
+        for (enc, dec) in encoded.into_iter().zip(decoded.into_iter()) {
+            let actual_enc = super::encode(&dec).unwrap();
+            assert_eq!(enc, actual_enc);
+        }
+    }
+
+    #[test]
+    fn decode_path() {
+        let encoded = path::encoded();
+        let decoded = path::decoded();
+        for (enc, dec) in encoded.into_iter().zip(decoded.into_iter()) {
+            let actual_dec = super::decode(&enc).unwrap();
+            assert_eq!(dec, actual_dec);
+        }
+    }
+
+    #[test]
+    fn roundtrip_path() {
+        let decoded = path::decoded();
+        for dec in decoded.into_iter() {
+            let enc = super::encode(&dec).unwrap();
+            let actual_dec = super::decode(&enc).unwrap();
+            assert_eq!(dec, actual_dec);
+        }
+    }
+
+    #[test]
+    fn decode_path_err() {
+        let encoded = &[
+            r#""%""#,
+            r#""%%%""#,
+            r#""%FE""#,
+            r#""%FFFX""#,
+            r#""%FF%FF""#,
+        ];
+        for enc in encoded {
+            use std::path::PathBuf;
+            let p = super::decode::<PathBuf>(&enc);
+            assert!(p.is_err());
+        }
+    }
 }

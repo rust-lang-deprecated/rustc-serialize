@@ -605,17 +605,73 @@ array! {
     15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0
 }
 
+/// Just used for Path de/encoding
+trait Int {
+    fn to_u16(&self) -> u16;
+    fn from_u16(u16) -> Self;
+}
+impl Int for u8 {
+    fn to_u16(&self) -> u16 { *self as u16 }
+    fn from_u16(v: u16) -> Self { v as u8 }
+}
+impl Int for u16 {
+    fn to_u16(&self) -> u16 { *self }
+    fn from_u16(v: u16) -> Self { v }
+}
+
+/// Paths are usually valid unicode or at least contain mostly ascii,
+/// so optimize for the common case by emitting strings.
+fn encode_path<T: Int, S: Encoder>(str_path: Option<&str>,
+                                   raw_path: &[T],
+                                   e: &mut S)
+                                   -> Result<(), S::Error> {
+    let len_hint = raw_path.len();
+    let raw_path = raw_path.iter().map(|v| v.to_u16());
+
+    if let Some(s) = str_path {
+        if !s.contains('%') {
+            // Path is completely utf8 and doesn't contain the escape symbol,
+            // encode as string directly
+            return s.encode(e);
+        }
+    }
+
+    // Path is not entirely utf8, escape some values and encode as string.
+
+    // Encoded string will have minimum size `len`.
+    let mut s = String::with_capacity(len_hint);
+
+    // Use a very simple scheme: Anything non-ascii gets escaped
+    // in the form "%FFFF", which allows us not to
+    // worry about the underlying encoding.
+    for v in raw_path {
+        if v == '%' as u16 {
+            s.push_str("%%");
+        } else if v <= 127 {
+            s.push(v as u8 as char);
+        } else {
+            s.push_str(&format!("%{:04X}", v));
+        }
+    }
+
+    s.encode(e)
+}
+
 impl Encodable for path::Path {
     #[cfg(unix)]
     fn encode<S: Encoder>(&self, e: &mut S) -> Result<(), S::Error> {
         use std::os::unix::prelude::*;
-        self.as_os_str().as_bytes().encode(e)
+        let os_slice = self.as_os_str().as_bytes();
+
+        encode_path(self.to_str(), os_slice, e)
     }
     #[cfg(windows)]
     fn encode<S: Encoder>(&self, e: &mut S) -> Result<(), S::Error> {
         use std::os::windows::prelude::*;
         let v = self.as_os_str().encode_wide().collect::<Vec<_>>();
-        v.encode(e)
+        let os_slice = &v[..];
+
+        encode_path(self.to_str(), os_slice, e)
     }
 }
 
@@ -625,24 +681,79 @@ impl Encodable for path::PathBuf {
     }
 }
 
+fn decode_path<T: Int, D: Decoder, F>(d: &mut D, f: F)
+                                      -> Result<path::PathBuf, D::Error>
+    where F: FnOnce(Vec<T>) -> OsString
+{
+    let encoded_path = try!(d.read_str());
+    let s: OsString = if !encoded_path.contains('%') {
+        encoded_path.into()
+    } else {
+        let mut raw_code_units = Vec::with_capacity(encoded_path.len());
+
+        // If string contains '%', then it is ascii-only,
+        // which means we can work on single bytes directly
+        let mut chars = encoded_path.bytes();
+
+        while let Some(c) = chars.next() {
+            if c != b'%' {
+                raw_code_units.push(T::from_u16(c as u16));
+            } else {
+                let c = chars.next();
+                if c == Some(b'%') {
+                    // Map "%%" to '%'
+
+                    raw_code_units.push(T::from_u16(b'%' as u16));
+                } else {
+                    // Map "%XXXX" to u16
+                    use std::str::from_utf8;
+
+                    let mut err = || {
+                        d.error("path escape sequence is invalid")
+                    };
+
+                    let d0 = try!(c.ok_or_else(|| err()));
+                    let d1 = try!(chars.next().ok_or_else(|| err()));
+                    let d2 = try!(chars.next().ok_or_else(|| err()));
+                    let d3 = try!(chars.next().ok_or_else(|| err()));
+
+                    let encoded_u16 = [d0, d1, d2, d3];
+                    let encoded_u16 = try! {
+                        from_utf8(&encoded_u16)
+                            .map_err(|_| err())
+                    };
+
+                    let raw_val = try! {
+                        u16::from_str_radix(encoded_u16, 16)
+                            .map_err(|_| err())
+                    };
+
+                    // serialization is platform dependent and
+                    // on unix this should never get a value > 255,
+                    // so the truncation in the trait impl is fine.
+                    raw_code_units.push(T::from_u16(raw_val));
+                }
+            }
+        }
+
+        f(raw_code_units)
+    };
+
+    let mut p = path::PathBuf::new();
+    p.push(s);
+    Ok(p)
+}
+
 impl Decodable for path::PathBuf {
     #[cfg(unix)]
     fn decode<D: Decoder>(d: &mut D) -> Result<path::PathBuf, D::Error> {
         use std::os::unix::prelude::*;
-        let bytes: Vec<u8> = try!(Decodable::decode(d));
-        let s: OsString = OsStringExt::from_vec(bytes);
-        let mut p = path::PathBuf::new();
-        p.push(s);
-        Ok(p)
+        decode_path(d, |bytes| OsStringExt::from_vec(bytes))
     }
     #[cfg(windows)]
     fn decode<D: Decoder>(d: &mut D) -> Result<path::PathBuf, D::Error> {
         use std::os::windows::prelude::*;
-        let bytes: Vec<u16> = try!(Decodable::decode(d));
-        let s: OsString = OsStringExt::from_wide(&bytes);
-        let mut p = path::PathBuf::new();
-        p.push(s);
-        Ok(p)
+        decode_path(d, |u16s| OsStringExt::from_wide(&u16s))
     }
 }
 
