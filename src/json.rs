@@ -1681,7 +1681,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
                         self.bump();
                         return Ok(res);
                     },
-                    Some(c) if c.is_control() =>
+                    Some(c) if c <= '\u{1F}' =>
                         return self.error(ControlCharacterInString),
                     Some(c) => res.push(c),
                     None => unreachable!()
@@ -2970,6 +2970,16 @@ mod tests {
         assert_eq!(Json::from_str("\""),     Err(SyntaxError(EOFWhileParsingString, 1, 2)));
         assert_eq!(Json::from_str("\"lol"),  Err(SyntaxError(EOFWhileParsingString, 1, 5)));
         assert_eq!(Json::from_str("\"\n\""), Err(SyntaxError(ControlCharacterInString, 2, 1)));
+        assert_eq!(Json::from_str("\"\0\""), Err(SyntaxError(ControlCharacterInString, 1, 2)));
+        assert_eq!(Json::from_str("\"\u{1}\""), Err(SyntaxError(ControlCharacterInString, 1, 2)));
+        assert_eq!(Json::from_str("\"\u{1F}\""), Err(SyntaxError(ControlCharacterInString, 1, 2)));
+
+        // Only C0 control characters are excluded.
+        assert!('\u{7F}'.is_control());
+        assert!('\u{80}'.is_control());
+        assert!('\u{9F}'.is_control());
+        let c1_controls = "\u{7F}\u{80}\u{9F}".to_string();
+        assert_eq!(Json::from_str(&format!("\"{}\"", c1_controls)), Ok(String(c1_controls)));
 
         assert_eq!(Json::from_str("\"\""), Ok(String("".to_string())));
         assert_eq!(Json::from_str("\"foo\""), Ok(String("foo".to_string())));
