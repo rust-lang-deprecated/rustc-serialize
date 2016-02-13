@@ -408,6 +408,11 @@ mod tests {
     }
 
     #[test]
+    fn test_to_base64_empty_line_length() {
+        [].to_base64(Config {line_length: Some(72), ..STANDARD});
+    }
+
+    #[test]
     fn test_from_base64_basic() {
         assert_eq!("".from_base64().unwrap(), b"");
         assert_eq!("Zg==".from_base64().unwrap(), b"f");
