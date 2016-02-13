@@ -1934,7 +1934,7 @@ impl<T: Iterator<Item = char>> Builder<T> {
         match self.token.take() {
             None => {}
             Some(Error(e)) => { return Err(e); }
-            ref tok => { panic!("unexpected token {:?}", tok); }
+            _ => { return Err(SyntaxError(InvalidSyntax, self.parser.line, self.parser.col)); }
         }
         result
     }
@@ -3943,5 +3943,13 @@ mod tests {
         let s = super::encode(&f).unwrap();
         let d = super::decode(&s).unwrap();
         assert_eq!(f, d);
+    }
+
+    #[test]
+    fn test_unexpected_token() {
+        match Json::from_str("{\"\":\"\",\"\":{\"\":\"\",\"\":[{\"\":\"\",}}}") {
+            Err(e) => assert_eq!(e, SyntaxError(InvalidSyntax, 1, 32)),
+            _ => ()
+        };
     }
 }
