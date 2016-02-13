@@ -105,7 +105,10 @@ impl ToBase64 for [u8] {
         // Preallocate memory.
         let mut prealloc_len = (len + 2) / 3 * 4;
         if let Some(line_length) = config.line_length {
-            let num_lines = (prealloc_len - 1) / line_length;
+            let num_lines = match prealloc_len {
+                0 => 0,
+                n => (n - 1) / line_length
+            };
             prealloc_len += num_lines * newline.bytes().count();
         }
 
