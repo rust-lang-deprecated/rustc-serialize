@@ -1492,6 +1492,8 @@ impl<T: Iterator<Item = char>> Parser<T> {
                 // Make sure we don't underflow.
                 if res > (i64::MAX as u64) + 1 {
                     Error(SyntaxError(InvalidNumber, self.line, self.col))
+                } else if res == 0 {
+                    I64Value(res as i64)
                 } else {
                     I64Value((!res + 1) as i64)
                 }
@@ -3423,6 +3425,11 @@ mod tests {
             Err(_) => panic!("Unable to parse json_str: {}", json_str),
             _ => {} // it parsed and we are good to go
         }
+    }
+    
+    #[test]
+    fn test_negative_zero() {
+        Json::from_str("{\"test\":-0}").unwrap();
     }
 
     #[test]
