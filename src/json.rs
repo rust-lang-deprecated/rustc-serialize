@@ -1932,7 +1932,7 @@ impl<T: Iterator<Item = char>> Builder<T> {
         match self.token.take() {
             None => {}
             Some(Error(e)) => { return Err(e); }
-            ref tok => { panic!("unexpected token {:?}", tok); }
+            _ => { return Err(SyntaxError(InvalidSyntax, self.parser.line, self.parser.col)); }
         }
         result
     }
