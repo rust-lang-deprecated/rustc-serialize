@@ -3937,4 +3937,12 @@ mod tests {
         let d = super::decode(&s).unwrap();
         assert_eq!(f, d);
     }
+
+    #[test]
+    fn test_unexpected_token() {
+        match Json::from_str("{\"\":\"\",\"\":{\"\":\"\",\"\":[{\"\":\"\",}}}") {
+            Err(e) => assert_eq!(e, SyntaxError(InvalidSyntax, 1, 32)),
+            _ => ()
+        };
+    }
 }
