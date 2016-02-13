@@ -3424,6 +3424,11 @@ mod tests {
             _ => {} // it parsed and we are good to go
         }
     }
+    
+    #[test]
+    fn test_negative_zero() {
+        Json::from_str("{\"test\":-0}").unwrap();
+    }
 
     #[test]
     fn test_prettyencode_hashmap_with_numeric_key() {
