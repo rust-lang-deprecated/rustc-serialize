@@ -105,7 +105,10 @@ impl ToBase64 for [u8] {
         // Preallocate memory.
         let mut prealloc_len = (len + 2) / 3 * 4;
         if let Some(line_length) = config.line_length {
-            let num_lines = (prealloc_len - 1) / line_length;
+            let num_lines = match prealloc_len {
+                0 => 0,
+                n => (n - 1) / line_length
+            };
             prealloc_len += num_lines * newline.bytes().count();
         }
 
@@ -405,6 +408,11 @@ mod tests {
     fn test_to_base64_url_safe() {
         assert_eq!([251, 255].to_base64(URL_SAFE), "-_8");
         assert_eq!([251, 255].to_base64(STANDARD), "+/8=");
+    }
+
+    #[test]
+    fn test_to_base64_empty_line_length() {
+        [].to_base64(Config {line_length: Some(72), ..STANDARD});
     }
 
     #[test]
