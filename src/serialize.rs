@@ -176,12 +176,12 @@ pub trait Decoder {
         where F: FnMut(&mut Self, bool) -> Result<T, Self::Error>;
 
     fn read_seq<T, F>(&mut self, f: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self, usize) -> Result<T, Self::Error>;
+        where F: FnOnce(&mut Self, usize, usize) -> Result<T, Self::Error>;
     fn read_seq_elt<T, F>(&mut self, idx: usize, f: F) -> Result<T, Self::Error>
         where F: FnOnce(&mut Self) -> Result<T, Self::Error>;
 
     fn read_map<T, F>(&mut self, f: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self, usize) -> Result<T, Self::Error>;
+        where F: FnOnce(&mut Self, usize, usize) -> Result<T, Self::Error>;
     fn read_map_elt_key<T, F>(&mut self, idx: usize, f: F)
                               -> Result<T, Self::Error>
         where F: FnOnce(&mut Self) -> Result<T, Self::Error>;
@@ -478,8 +478,8 @@ impl<T:Encodable> Encodable for Vec<T> {
 
 impl<T:Decodable> Decodable for Vec<T> {
     fn decode<D: Decoder>(d: &mut D) -> Result<Vec<T>, D::Error> {
-        d.read_seq(|d, len| {
-            let mut v = Vec::with_capacity(len);
+        d.read_seq(|d, len, capacity| {
+            let mut v = Vec::with_capacity(capacity);
             for i in 0..len {
                 v.push(try!(d.read_seq_elt(i, |d| Decodable::decode(d))));
             }
@@ -574,7 +574,7 @@ macro_rules! array {
     ($len:expr, $($idx:expr),*) => {
         impl<T:Decodable> Decodable for [T; $len] {
             fn decode<D: Decoder>(d: &mut D) -> Result<[T; $len], D::Error> {
-                d.read_seq(|d, len| {
+                d.read_seq(|d, len, _capacity| {
                     if len != $len {
                         return Err(d.error("wrong array length"));
                     }
@@ -721,8 +721,8 @@ impl<D: Decoder> DecoderHelpers for D {
     fn read_to_vec<T, F>(&mut self, mut f: F) -> Result<Vec<T>, D::Error> where F:
         FnMut(&mut D) -> Result<T, D::Error>,
     {
-        self.read_seq(|this, len| {
-            let mut v = Vec::with_capacity(len);
+        self.read_seq(|this, len, capacity| {
+            let mut v = Vec::with_capacity(capacity);
             for i in 0..len {
                 v.push(try!(this.read_seq_elt(i, |this| f(this))));
             }
