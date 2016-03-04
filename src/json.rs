@@ -1552,18 +1552,18 @@ impl<T: Iterator<Item = char>> Parser<T> {
              _ => return self.error(InvalidNumber)
         }
 
-        let mut dec = 1.0;
+        let mut dec = "0.".to_string();
         while !self.eof() {
             match self.ch_or_null() {
                 c @ '0' ... '9' => {
-                    dec /= 10.0;
-                    res += (((c as isize) - ('0' as isize)) as f64) * dec;
+                    dec.push(c);
                     self.bump();
                 }
                 _ => break,
             }
         }
 
+        res += dec.parse::<f64>().unwrap();
         Ok(res)
     }
 
@@ -1597,11 +1597,10 @@ impl<T: Iterator<Item = char>> Parser<T> {
             }
         }
 
-        let exp = 10_f64.powi(exp as i32);
         if neg_exp {
-            res /= exp;
+            res = format!("{}e-{}", res, exp).parse::<f64>().unwrap();
         } else {
-            res *= exp;
+            res = format!("{}e+{}", res, exp).parse::<f64>().unwrap();
         }
 
         Ok(res)
