@@ -2938,6 +2938,9 @@ mod tests {
         let v: f64 = super::decode("0.4").unwrap();
         assert_eq!(v, 0.4);
 
+        let v: f64 = super::decode("0.123").unwrap();
+        assert_eq!(v, 0.123);
+
         let v: f64 = super::decode("0.4e5").unwrap();
         assert_eq!(v, 0.4e5);
 
@@ -2946,6 +2949,12 @@ mod tests {
 
         let v: f64 = super::decode("0.4e-01").unwrap();
         assert_eq!(v, 0.4e-01);
+
+        let v: f64 = super::decode("0.3e+9").unwrap();
+        assert_eq!(v, 0.3e+9);
+
+        let v: f64 = super::decode("0.3e-11").unwrap();
+        assert_eq!(v, 0.3e-11);
 
         let v: u64 = super::decode("0").unwrap();
         assert_eq!(v, 0);
