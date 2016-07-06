@@ -805,9 +805,26 @@ pub trait Decoder {
 /// types (like `i32` and `Vec<T>`) have `Encodable` implementations provided by
 /// this module.
 ///
+/// Note that, in general, you should let the compiler implement this for you by
+/// using the `derive(RustcEncodable)` attribute.
+///
 /// # Examples
 ///
+/// ```rust
+/// extern crate rustc_serialize;
+///
+/// #[derive(RustcEncodable)]
+/// struct Point {
+///     x: i32,
+///     y: i32,
+/// }
+/// # fn main() {}
 /// ```
+///
+/// This generates code equivalent to:
+///
+/// ```rust
+/// extern crate rustc_serialize;
 /// use rustc_serialize::Encodable;
 /// use rustc_serialize::Encoder;
 ///
@@ -829,6 +846,7 @@ pub trait Decoder {
 ///         })
 ///     }
 /// }
+/// # fn main() {}
 /// ```
 pub trait Encodable {
     /// Serialize a value using an `Encoder`.
@@ -842,9 +860,26 @@ pub trait Encodable {
 /// types (like `i32` and `Vec<T>`) have `Decodable` implementations provided by
 /// this module.
 ///
+/// Note that, in general, you should let the compiler implement this for you by
+/// using the `derive(RustcDecodable)` attribute.
+///
 /// # Examples
 ///
+/// ```rust
+/// extern crate rustc_serialize;
+///
+/// #[derive(RustcDecodable)]
+/// struct Point {
+///     x: i32,
+///     y: i32,
+/// }
+/// # fn main() {}
 /// ```
+///
+/// This generates code equivalent to:
+///
+/// ```rust
+/// extern crate rustc_serialize;
 /// use rustc_serialize::Decodable;
 /// use rustc_serialize::Decoder;
 ///
@@ -862,6 +897,7 @@ pub trait Encodable {
 ///         })
 ///     }
 /// }
+/// # fn main() {}
 /// ```
 pub trait Decodable: Sized {
     /// Deserialize a value using a `Decoder`.
