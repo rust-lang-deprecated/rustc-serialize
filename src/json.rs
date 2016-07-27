@@ -331,7 +331,7 @@ pub enum DecoderError {
     EOF,
 }
 
-#[derive(Copy, Debug)]
+#[derive(Copy, PartialEq, Debug)]
 pub enum EncoderError {
     FmtError(fmt::Error),
     BadHashmapKey,
