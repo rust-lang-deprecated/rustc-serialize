@@ -1309,6 +1309,10 @@ array! {
 }
 
 impl Encodable for path::Path {
+    #[cfg(redox)]
+    fn encode<S: Encoder>(&self, e: &mut S) -> Result<(), S::Error> {
+        self.as_os_str().to_str().unwrap().encode(e)
+    }
     #[cfg(unix)]
     fn encode<S: Encoder>(&self, e: &mut S) -> Result<(), S::Error> {
         use std::os::unix::prelude::*;
@@ -1329,6 +1333,14 @@ impl Encodable for path::PathBuf {
 }
 
 impl Decodable for path::PathBuf {
+    #[cfg(redox)]
+    fn decode<D: Decoder>(d: &mut D) -> Result<path::PathBuf, D::Error> {
+        let string: String = try!(Decodable::decode(d));
+        let s: OsString = OsString::from(string);
+        let mut p = path::PathBuf::new();
+        p.push(s);
+        Ok(p)
+    }
     #[cfg(unix)]
     fn decode<D: Decoder>(d: &mut D) -> Result<path::PathBuf, D::Error> {
         use std::os::unix::prelude::*;
