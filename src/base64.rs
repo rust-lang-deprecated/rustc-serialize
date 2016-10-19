@@ -191,6 +191,12 @@ impl ToBase64 for [u8] {
     }
 }
 
+impl<'a, T: ?Sized + ToBase64> ToBase64 for &'a T {
+    fn to_base64(&self, config: Config) -> String {
+        (**self).to_base64(config)
+    }
+}
+
 /// A trait for converting from base64 encoded values.
 pub trait FromBase64 {
     /// Converts the value of `self`, interpreted as base64 encoded data, into
@@ -314,6 +320,12 @@ impl FromBase64 for [u8] {
         }
 
         Ok(r)
+    }
+}
+
+impl<'a, T: ?Sized + FromBase64> FromBase64 for &'a T {
+    fn from_base64(&self) -> Result<Vec<u8>, FromBase64Error> {
+        (**self).from_base64()
     }
 }
 
