@@ -753,7 +753,7 @@ pub trait Decoder {
     /// Read an associative container (map).
     ///
     /// * `f` is a function that will be passed the number of entries in the
-    ///   map, and will call `emit_map_elt_key` and `emit_map_elt_val` to decode
+    ///   map, and will call `read_map_elt_key` and `read_map_elt_val` to decode
     ///   each entry.
     fn read_map<T, F>(&mut self, f: F) -> Result<T, Self::Error>
         where F: FnOnce(&mut Self, usize) -> Result<T, Self::Error>;
