@@ -1273,8 +1273,8 @@ macro_rules! tuple {
 tuple! { T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, }
 
 macro_rules! array {
-    ($zero:expr) => ();
-    ($len:expr, $($idx:expr),*) => {
+    () => ();
+    ($len:expr, $($idx:expr,)*) => {
         impl<T:Decodable> Decodable for [T; $len] {
             fn decode<D: Decoder>(d: &mut D) -> Result<[T; $len], D::Error> {
                 d.read_seq(|d, len| {
@@ -1284,7 +1284,7 @@ macro_rules! array {
                     Ok([$(
                         try!(d.read_seq_elt($len - $idx - 1,
                                             |d| Decodable::decode(d)))
-                    ),+])
+                    ),*])
                 })
             }
         }
@@ -1299,13 +1299,13 @@ macro_rules! array {
                 })
             }
         }
-        array! { $($idx),* }
+        array! { $($idx,)* }
     }
 }
 
 array! {
     32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16,
-    15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0
+    15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0,
 }
 
 impl Encodable for path::Path {
