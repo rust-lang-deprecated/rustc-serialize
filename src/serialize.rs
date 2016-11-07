@@ -620,7 +620,7 @@ pub trait Decoder {
     /// and may (but are not required to) return an error if these are
     /// inconsistent.
     fn read_enum_struct_variant_field<T, F>(&mut self,
-                                            &f_name: &str,
+                                            f_name: &str,
                                             f_idx: usize,
                                             f: F)
                                             -> Result<T, Self::Error>
