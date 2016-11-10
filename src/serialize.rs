@@ -1309,7 +1309,7 @@ array! {
 }
 
 impl Encodable for path::Path {
-    #[cfg(redox)]
+    #[cfg(target_os = "redox")]
     fn encode<S: Encoder>(&self, e: &mut S) -> Result<(), S::Error> {
         self.as_os_str().to_str().unwrap().encode(e)
     }
@@ -1333,7 +1333,7 @@ impl Encodable for path::PathBuf {
 }
 
 impl Decodable for path::PathBuf {
-    #[cfg(redox)]
+    #[cfg(target_os = "redox")]
     fn decode<D: Decoder>(d: &mut D) -> Result<path::PathBuf, D::Error> {
         let string: String = try!(Decodable::decode(d));
         let s: OsString = OsString::from(string);
