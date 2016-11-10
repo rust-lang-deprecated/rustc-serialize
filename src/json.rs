@@ -331,10 +331,20 @@ pub enum DecoderError {
     EOF,
 }
 
-#[derive(Copy, PartialEq, Debug)]
+#[derive(Copy, Debug)]
 pub enum EncoderError {
     FmtError(fmt::Error),
     BadHashmapKey,
+}
+
+impl PartialEq for EncoderError {
+    fn eq(&self, other: &EncoderError) -> bool {
+        match (*self, *other) {
+            (EncoderError::FmtError(_), EncoderError::FmtError(_)) => true,
+            (EncoderError::BadHashmapKey, EncoderError::BadHashmapKey) => true,
+            _ => false,
+        }
+    }
 }
 
 impl Clone for EncoderError {
