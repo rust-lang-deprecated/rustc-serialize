@@ -15,7 +15,8 @@ after_success:
   - travis-cargo --only nightly doc-upload
 env:
   global:
-    secure: "TyMGH+sbPmKs9lKCziKShxWr3G6im0owEchVrbUChWnQIQv1WydXftFoEoUsVl6qZspjehWK1b1AsnIgCXK0HtEi4DnqLsxs0s36bOjfg5yHBT/pETTr6kcq7KAL4Be4GmI331k6gT1Oi0TPFp7Sg9xpiWsQqKIHA5Szk2wpFQ8="
+    secure: "kJnqqAXRl0C7Afx0c8Y3vA6TAEZsxlasu7eIZMdCbNS4N1+Rwh0jNTa2jy2D3CQCrzW5OCefnkpkPTu8mADrAjedM4p/9X5UXZi0sgg2lzCgfGwrRzitTnyPDkdYidiu4QeC/r0WPC8lYZKHkJXYhF8bZgchB9ypnZ6LAHCcDkA="
+
 
 
 notifications:
