@@ -1580,18 +1580,18 @@ impl<T: Iterator<Item = char>> Parser<T> {
              _ => return self.error(InvalidNumber)
         }
 
-        let mut dec = 1.0;
+        let mut dec = "0.".to_string();
         while !self.eof() {
             match self.ch_or_null() {
                 c @ '0' ... '9' => {
-                    dec /= 10.0;
-                    res += (((c as isize) - ('0' as isize)) as f64) * dec;
+                    dec.push(c);
                     self.bump();
                 }
                 _ => break,
             }
         }
 
+        res += dec.parse::<f64>().unwrap();
         Ok(res)
     }
 
@@ -1625,11 +1625,10 @@ impl<T: Iterator<Item = char>> Parser<T> {
             }
         }
 
-        let exp = 10_f64.powi(exp as i32);
         if neg_exp {
-            res /= exp;
+            res = format!("{}e-{}", res, exp).parse::<f64>().unwrap();
         } else {
-            res *= exp;
+            res = format!("{}e+{}", res, exp).parse::<f64>().unwrap();
         }
 
         Ok(res)
@@ -2966,6 +2965,9 @@ mod tests {
         let v: f64 = super::decode("0.4").unwrap();
         assert_eq!(v, 0.4);
 
+        let v: f64 = super::decode("0.123").unwrap();
+        assert_eq!(v, 0.123);
+
         let v: f64 = super::decode("0.4e5").unwrap();
         assert_eq!(v, 0.4e5);
 
@@ -2974,6 +2976,12 @@ mod tests {
 
         let v: f64 = super::decode("0.4e-01").unwrap();
         assert_eq!(v, 0.4e-01);
+
+        let v: f64 = super::decode("0.3e+9").unwrap();
+        assert_eq!(v, 0.3e+9);
+
+        let v: f64 = super::decode("0.3e-11").unwrap();
+        assert_eq!(v, 0.3e-11);
 
         let v: u64 = super::decode("0").unwrap();
         assert_eq!(v, 0);
