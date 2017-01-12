@@ -1481,11 +1481,10 @@ impl<T: Iterator<Item = char>> Parser<T> {
     }
 
     fn parse_number(&mut self) -> JsonEvent {
-        let mut neg = false;
+        let neg = self.ch_is('-');
 
-        if self.ch_is('-') {
+        if neg {
             self.bump();
-            neg = true;
         }
 
         let res = match self.parse_u64() {
