@@ -2939,6 +2939,7 @@ mod tests {
         assert_nearly_eq!(Json::from_str("123456789.5024").unwrap().as_f64().unwrap(),
                           123456789.5024, 1e-5);
         assert_eq!(Json::from_str(" 3 "), Ok(U64(3)));
+        assert_eq!(Json::from_str("20000000000000000000.0"), Ok(F64(2.0e19)));
 
         assert_eq!(Json::from_str("-9223372036854775808"), Ok(I64(i64::MIN)));
         assert_eq!(Json::from_str("9223372036854775807"), Ok(U64(i64::MAX as u64)));
