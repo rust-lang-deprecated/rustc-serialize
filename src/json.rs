@@ -2564,6 +2564,7 @@ impl FromStr for Json {
 }
 
 #[cfg(test)]
+
 mod tests {
     use self::Animal::*;
     use {Encodable, Decodable};
@@ -2904,6 +2905,17 @@ mod tests {
         assert_eq!(v, false);
     }
 
+    /// Test if two values are within 1% of each other
+    ///
+    /// Useful when floating point imprecision is a factor. f64 should
+    /// have 53 bits for the coefficient, but we test if the result is
+    /// within 50 bits.
+    macro_rules! assert_nearly_eq {
+        ($e1:expr,$e2:expr) => {
+            assert!((($e1-$e2)/$e1).abs() < 2.0f64.powi(50).recip());
+        }
+    }
+
     #[test]
     fn test_read_number() {
         assert_eq!(Json::from_str("+"),   Err(SyntaxError(InvalidSyntax, 1, 1)));
@@ -2925,7 +2937,7 @@ mod tests {
         assert_eq!(Json::from_str("0.4"), Ok(F64(0.4)));
         assert_eq!(Json::from_str("0.4e5"), Ok(F64(0.4e5)));
         assert_eq!(Json::from_str("0.4e+15"), Ok(F64(0.4e15)));
-        assert_eq!(Json::from_str("0.4e-01"), Ok(F64(0.4e-01)));
+        assert_nearly_eq!(Json::from_str("0.4e-01"), Ok(F64(0.4e-01)));
         assert_eq!(Json::from_str("123456789.5024"), Ok(F64(123456789.5024)));
         assert_eq!(Json::from_str(" 3 "), Ok(U64(3)));
         assert_eq!(Json::from_str("20000000000000000000.0"), Ok(F64(2.0e19)));
@@ -2956,7 +2968,7 @@ mod tests {
         assert_eq!(v, 0.4e15);
 
         let v: f64 = super::decode("0.4e-01").unwrap();
-        assert_eq!(v, 0.4e-01);
+        assert_nearly_eq!(v, 0.4e-01);
 
         let v: f64 = super::decode("123456789.5024").unwrap();
         assert_eq!(v, 123456789.5024);
