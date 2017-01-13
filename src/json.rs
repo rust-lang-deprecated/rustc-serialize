@@ -2926,6 +2926,15 @@ mod tests {
         assert_eq!(v, false);
     }
 
+    /// Test if two values are within a specified tolerance
+    ///
+    /// Useful when floating point imprecision is a factor.
+    macro_rules! assert_nearly_eq {
+        ($e1:expr,$e2:expr,$tolerance:expr) => {
+            assert!(($e1-$e2).abs() < $tolerance)
+        }
+    }
+
     #[test]
     fn test_read_number() {
         assert_eq!(Json::from_str("+"),   Err(SyntaxError(InvalidSyntax, 1, 1)));
@@ -2947,8 +2956,10 @@ mod tests {
         assert_eq!(Json::from_str("0.4"), Ok(F64(0.4)));
         assert_eq!(Json::from_str("0.4e5"), Ok(F64(0.4e5)));
         assert_eq!(Json::from_str("0.4e+15"), Ok(F64(0.4e15)));
-        assert_eq!(Json::from_str("0.4e-01"), Ok(F64(0.4e-01)));
-        assert_eq!(Json::from_str("123456789.5024"), Ok(F64(123456789.5024)));
+        assert_nearly_eq!(Json::from_str("0.4e-01").unwrap().as_f64().unwrap(),
+                          0.4e-01, 1e-3);
+        assert_nearly_eq!(Json::from_str("123456789.5024").unwrap().as_f64().unwrap(),
+                          123456789.5024, 1e-5);
         assert_eq!(Json::from_str(" 3 "), Ok(U64(3)));
 
         assert_eq!(Json::from_str("-9223372036854775808"), Ok(I64(i64::MIN)));
@@ -2977,10 +2988,10 @@ mod tests {
         assert_eq!(v, 0.4e15);
 
         let v: f64 = super::decode("0.4e-01").unwrap();
-        assert_eq!(v, 0.4e-01);
+        assert_nearly_eq!(v, 0.4e-01, 1e-3);
 
         let v: f64 = super::decode("123456789.5024").unwrap();
-        assert_eq!(v, 123456789.5024);
+        assert_nearly_eq!(v, 123456789.5024, 1e-5);
 
         let v: u64 = super::decode("0").unwrap();
         assert_eq!(v, 0);
