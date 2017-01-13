@@ -2990,6 +2990,9 @@ mod tests {
         let v: f64 = super::decode("0.4e-01").unwrap();
         assert_nearly_eq!(v, 0.4e-01, 1e-3);
 
+        let v: f64 = super::decode("0.5e-01").unwrap();
+        assert_eq!(v, 0.5e-01);
+
         let v: f64 = super::decode("123456789.5024").unwrap();
         assert_nearly_eq!(v, 123456789.5024, 1e-5);
 
