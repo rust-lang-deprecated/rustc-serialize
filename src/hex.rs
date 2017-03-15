@@ -53,6 +53,12 @@ impl ToHex for [u8] {
     }
 }
 
+impl<'a, T: ?Sized + ToHex> ToHex for &'a T {
+    fn to_hex(&self) -> String {
+        (**self).to_hex()
+    }
+}
+
 /// A trait for converting hexadecimal encoded values
 pub trait FromHex {
     /// Converts the value of `self`, interpreted as hexadecimal encoded data,
@@ -152,6 +158,12 @@ impl FromHex for str {
             0 => Ok(b.into_iter().collect()),
             _ => Err(InvalidHexLength),
         }
+    }
+}
+
+impl<'a, T: ?Sized + FromHex> FromHex for &'a T {
+    fn from_hex(&self) -> Result<Vec<u8>, FromHexError> {
+        (**self).from_hex()
     }
 }
 

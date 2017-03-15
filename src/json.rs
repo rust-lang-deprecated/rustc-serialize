@@ -337,6 +337,16 @@ pub enum EncoderError {
     BadHashmapKey,
 }
 
+impl PartialEq for EncoderError {
+    fn eq(&self, other: &EncoderError) -> bool {
+        match (*self, *other) {
+            (EncoderError::FmtError(_), EncoderError::FmtError(_)) => true,
+            (EncoderError::BadHashmapKey, EncoderError::BadHashmapKey) => true,
+            _ => false,
+        }
+    }
+}
+
 impl Clone for EncoderError {
     fn clone(&self) -> Self { *self }
 }
@@ -1023,7 +1033,7 @@ impl Json {
         self.as_object().is_some()
     }
 
-    /// If the Json value is an Object, returns the associated BTreeMap.
+    /// If the Json value is an Object, returns a reference to the associated BTreeMap.
     /// Returns None otherwise.
     pub fn as_object<'a>(&'a self) -> Option<&'a Object> {
         match self {
@@ -1032,11 +1042,20 @@ impl Json {
         }
     }
 
-    /// If the Json value is an Object, returns the associated mutable BTreeMap.
+    /// If the Json value is an Object, returns a mutable reference to the associated BTreeMap.
     /// Returns None otherwise.
     pub fn as_object_mut<'a>(&'a mut self) -> Option<&'a mut Object> {
         match self {
             &mut Json::Object(ref mut map) => Some(map),
+            _ => None
+        }
+    }
+
+    /// If the Json value is an Object, returns the associated BTreeMap.
+    /// Returns None otherwise.
+    pub fn into_object(self) -> Option<Object> {
+        match self {
+            Json::Object(map) => Some(map),
             _ => None
         }
     }
@@ -1046,7 +1065,7 @@ impl Json {
         self.as_array().is_some()
     }
 
-    /// If the Json value is an Array, returns the associated vector.
+    /// If the Json value is an Array, returns a reference to the associated vector.
     /// Returns None otherwise.
     pub fn as_array<'a>(&'a self) -> Option<&'a Array> {
         match self {
@@ -1055,11 +1074,20 @@ impl Json {
         }
     }
 
-    /// If the Json value is an Array, returns the associated mutable vector.
+    /// If the Json value is an Array, returns a mutable reference to the associated vector.
     /// Returns None otherwise.
     pub fn as_array_mut<'a>(&'a mut self) -> Option<&'a mut Array> {
         match self {
             &mut Json::Array(ref mut list) => Some(list),
+            _ => None
+        }
+    }
+
+    /// If the Json value is an Array, returns the associated vector.
+    /// Returns None otherwise.
+    pub fn into_array(self) -> Option<Array> {
+        match self {
+            Json::Array(array) => Some(array),
             _ => None
         }
     }
@@ -1553,16 +1581,19 @@ impl<T: Iterator<Item = char>> Parser<T> {
         }
 
         let mut dec = 1.0;
+        let mut frac = 0.0;
         while !self.eof() {
             match self.ch_or_null() {
                 c @ '0' ... '9' => {
                     dec /= 10.0;
-                    res += (((c as isize) - ('0' as isize)) as f64) * dec;
+                    frac += (((c as isize) - ('0' as isize)) as f64) * dec;
                     self.bump();
                 }
                 _ => break,
             }
         }
+
+        res += frac;
 
         Ok(res)
     }
@@ -2917,6 +2948,7 @@ mod tests {
         assert_eq!(Json::from_str("0.4e5"), Ok(F64(0.4e5)));
         assert_eq!(Json::from_str("0.4e+15"), Ok(F64(0.4e15)));
         assert_eq!(Json::from_str("0.4e-01"), Ok(F64(0.4e-01)));
+        assert_eq!(Json::from_str("123456789.5024"), Ok(F64(123456789.5024)));
         assert_eq!(Json::from_str(" 3 "), Ok(U64(3)));
 
         assert_eq!(Json::from_str("-9223372036854775808"), Ok(I64(i64::MIN)));
@@ -2946,6 +2978,9 @@ mod tests {
 
         let v: f64 = super::decode("0.4e-01").unwrap();
         assert_eq!(v, 0.4e-01);
+
+        let v: f64 = super::decode("123456789.5024").unwrap();
+        assert_eq!(v, 123456789.5024);
 
         let v: u64 = super::decode("0").unwrap();
         assert_eq!(v, 0);
@@ -3176,6 +3211,15 @@ mod tests {
         let s = "{\"variant\":\"Frog\",\"fields\":[\"Henry\",349]}";
         let value: Animal = super::decode(s).unwrap();
         assert_eq!(value, Frog("Henry".to_string(), 349));
+    }
+
+    #[test]
+    fn test_decode_result() {
+        let value: Result<i32, i8> = Ok(4);
+        let json_value = super::encode(&value).unwrap();
+        assert_eq!(json_value, "{\"variant\":\"Ok\",\"fields\":[4]}");
+        let decoded_value: Result<i32, i8> = super::decode(&json_value).unwrap();
+        assert_eq!(decoded_value, Ok(4));
     }
 
     #[test]
@@ -3426,7 +3470,7 @@ mod tests {
             _ => {} // it parsed and we are good to go
         }
     }
-    
+
     #[test]
     fn test_negative_zero() {
         Json::from_str("{\"test\":-0}").unwrap();
