@@ -334,7 +334,7 @@ impl<'a, T: ?Sized + FromBase64> FromBase64 for &'a T {
 /// ```
 /// let mut ch = 0u8;
 /// for ch in 0..255 {
-///     let ch = ch as u8;
+///     let mut ch = ch as u8;
 ///     let code = match ch {
 ///         b'A'...b'Z' => ch - 0x41,
 ///         b'a'...b'z' => ch - 0x47,
