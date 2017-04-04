@@ -330,26 +330,26 @@ impl<'a, T: ?Sized + FromBase64> FromBase64 for &'a T {
 }
 
 /// Base64 decoding lookup table, generated using:
-/// ```rust
-///     let mut ch = 0u8;
-///     loop {
-///         let code = match ch {
-///             b'A'...b'Z' => ch - 0x41,
-///             b'a'...b'z' => ch - 0x47,
-///             b'0'...b'9' => ch + 0x04,
-///             b'+' | b'-' => 0x3E,
-///             b'/' | b'_' => 0x3F,
-///             b'=' => 0xFE,
-///             b'\r' | b'\n' => 0xFD,
-///             _ => 0xFF,
-///         };
-///         print!("0x{:02X}, ", code);
-///         if ch % 16  == 15 { println!(""); }
-///         else if ch == 0xFF { break; }
-///         ch += 1;
-///     }
-///     println!("");
+///
+/// ```
+/// let mut ch = 0u8;
+/// loop {
+///     let code = match ch {
+///         b'A'...b'Z' => ch - 0x41,
+///         b'a'...b'z' => ch - 0x47,
+///         b'0'...b'9' => ch + 0x04,
+///         b'+' | b'-' => 0x3E,
+///         b'/' | b'_' => 0x3F,
+///         b'=' => 0xFE,
+///         b'\r' | b'\n' => 0xFD,
+///         _ => 0xFF,
+///     };
+///     print!("0x{:02X}, ", code);
+///     if ch % 16  == 15 { println!(""); }
+///     else if ch == 0xFF { break; }
+///     ch += 1;
 /// }
+/// println!("");
 /// ```
 const DECODE_TABLE: [u8; 256] = [
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFD, 0xFF, 0xFF, 0xFD, 0xFF, 0xFF,
