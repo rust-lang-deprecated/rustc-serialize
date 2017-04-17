@@ -2585,6 +2585,54 @@ impl FromStr for Json {
     }
 }
 
+/// Shortcut macro to construct JSON.
+///
+/// This can be used for creating JSON objects in simple way.
+///
+/// # Examples
+///
+/// ```rust
+/// #[macro_use]
+/// extern crate rustc_serialize;
+/// use rustc_serialize::json::{Json, ToJson};
+///
+/// fn main() {
+///   let object = json!({
+///     "key" => "value",
+///     "data" => {
+///       "deep" => 10u64
+///     }
+///   });
+/// }
+/// ```
+#[macro_export]
+macro_rules! json {
+    ([$($val:tt),*]) => {{
+        let mut array = Vec::new();
+
+        $(
+            array.push(json!($val));
+        )*
+
+        Json::Array(array)
+    }};
+
+    ({ $($key:expr => $val:tt),* }) => {{
+        let mut object = BTreeMap::new();
+
+        $(
+            object.insert($key.to_owned(), json!($val));
+        )*
+
+        Json::Object(object)
+    }};
+
+    ($val:expr) => {{
+        $val.to_json()
+    }};
+}
+
+
 #[cfg(test)]
 mod tests {
     use self::Animal::*;
@@ -2596,7 +2644,7 @@ mod tests {
     use super::JsonEvent::*;
     use super::StackElement::*;
     use super::{Json, DecodeResult, DecoderError, JsonEvent, Parser,
-                StackElement, Stack, Decoder, Encoder, EncoderError};
+                StackElement, Stack, Decoder, Encoder, EncoderError, ToJson};
     use std::{i64, u64, f32, f64};
     use std::collections::BTreeMap;
     use std::string;
@@ -2853,6 +2901,60 @@ mod tests {
                ]\n\
              }"
         );
+    }
+
+    #[test]
+    fn test_macro_json_object() {
+        let generated = json!({
+            "string" => "value",
+            "owned" => ("value".to_owned()), // Check `String`
+            "u64" => 1u64,
+            "i64" => 2i64,
+            "f64" => 3.4f64,
+            "object" => {
+                "string" => "internal",
+                // TODO direct syntax
+                "subobject" => {
+                    "string" => "deep"
+                },
+                "array" => [1u64, 2.0f64, "3"]
+            },
+            "json" => Null // Json as is
+        });
+        let expected = mk_object(&[
+            ("string".to_string(), String("value".to_string())),
+            ("owned".to_string(), String("value".to_string())),
+            ("u64".to_string(), U64(1)),
+            ("i64".to_string(), I64(2)),
+            ("f64".to_string(), F64(3.4)),
+            ("object".to_string(), mk_object(&[
+                ("string".to_string(), String("internal".to_string())),
+                ("subobject".to_string(), mk_object(&[
+                    ("string".to_string(), String("deep".to_string())),
+                ])),
+                ("array".to_string(), Array(vec![U64(1), F64(2.0), String("3".to_owned())])),
+            ])),
+            ("json".to_string(), Null),
+        ]);
+        assert_eq!(generated, expected);
+    }
+
+    #[test]
+    fn test_macro_json_plain() {
+        let generated = json!(1u64);
+        let expected = U64(1);
+        assert_eq!(generated, expected);
+    }
+
+    #[test]
+    fn test_macro_json_array() {
+        let generated = json!([1.5f64, 2.5f64]);
+        let expected = Array(vec![F64(1.5f64), F64(2.5f64)]);
+        assert_eq!(generated, expected);
+        // One element array
+        let generated = json!(["string-value"]);
+        let expected = Array(vec![String("string-value".to_owned())]);
+        assert_eq!(generated, expected);
     }
 
     macro_rules! check_encoder_for_simple {
