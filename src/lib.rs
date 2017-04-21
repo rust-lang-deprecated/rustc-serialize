@@ -15,6 +15,8 @@
 //! > PRs will still be merged. It is very highly recommended by the Rust
 //! > Library Team that you use [`serde`], not this crate.
 //!
+//! [`serde`]: https://serde.rs
+//!
 //! # Usage
 //!
 //! This crate is [on crates.io](https://crates.io/crates/rustc-serialize) and
