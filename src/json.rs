@@ -521,9 +521,8 @@ fn escape_str(wr: &mut fmt::Write, v: &str) -> EncodeResult<()> {
 
 fn escape_char(writer: &mut fmt::Write, v: char) -> EncodeResult<()> {
     let mut buf = [0; 4];
-    let _ = write!(&mut &mut buf[..], "{}", v);
-    let buf = unsafe { str::from_utf8_unchecked(&buf[..v.len_utf8()]) };
-    escape_str(writer, buf)
+    let s = v.encode_utf8(&mut buf);
+    escape_str(writer, s)
 }
 
 fn spaces(wr: &mut fmt::Write, n: u32) -> EncodeResult<()> {
