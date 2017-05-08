@@ -1480,62 +1480,96 @@ impl<T: Iterator<Item = char>> Parser<T> {
               self.ch_is('\r') { self.bump(); }
     }
 
-    fn parse_number(&mut self) -> JsonEvent {
-        let mut neg = false;
+    /// Converts i64 or u64 from a string. If the string is large
+    /// enough to overflow, then the string is truncated to determine
+    /// when the overflow occured.
+    fn int_from_str<N: FromStr>(&self, string: &String)
+                                 -> Result<N, ParserError> {
+        match <N>::from_str(&string) {
+            Ok(res) => Ok(res),
+            Err(_) => {
+                // If there was an error, then we try shortening the
+                // string to find the location that the error was
+                // introduced.
+                for i in 1 .. string.len() {
+                    match <N>::from_str(&string[0..(string.len() - i - 1)]) {
+                        Ok(_) => {
+                            let serr = SyntaxError(InvalidNumber, self.line,
+                                                   self.col - i);
+                            return Err(serr);
+                        }
+                        _ => ()
+                    }
+                }
+                return Err(SyntaxError(InvalidNumber,
+                                       self.line, self.col));
+            }
+        }
+    }
 
-        if self.ch_is('-') {
+    fn parse_number(&mut self) -> JsonEvent {
+        let mut s = String::new();
+        let neg = self.ch_is('-');
+
+        if neg {
             self.bump();
-            neg = true;
+            s.push('-');
         }
 
-        let res = match self.parse_u64() {
-            Ok(res) => res,
+        match self.get_leading_digits() {
+            Ok(res) => s.push_str(&res),
             Err(e) => { return Error(e); }
         };
 
         if self.ch_is('.') || self.ch_is('e') || self.ch_is('E') {
-            let mut res = res as f64;
-
             if self.ch_is('.') {
-                res = match self.parse_decimal(res) {
-                    Ok(res) => res,
+                s.push('.');
+                self.bump();
+                match self.get_digits() {
+                    Ok(res) => s.push_str(&res),
                     Err(e) => { return Error(e); }
                 };
             }
 
             if self.ch_is('e') || self.ch_is('E') {
-                res = match self.parse_exponent(res) {
-                    Ok(res) => res,
+                s.push('e');
+                self.bump();
+                if self.ch_is('+') || self.ch_is('-') {
+                    s.push(self.ch_or_null());
+                    self.bump();
+                }
+                match self.get_digits() {
+                    Ok(res) => s.push_str(&res),
                     Err(e) => { return Error(e); }
                 };
             }
 
-            if neg {
-                res *= -1.0;
+            match f64::from_str(&s) {
+                Ok(res) => F64Value(res),
+                Err(_) => Error(SyntaxError(InvalidNumber,
+                                            self.line, self.col))
             }
-
-            F64Value(res)
         } else {
             if neg {
-                // Make sure we don't underflow.
-                if res > (i64::MAX as u64) + 1 {
-                    Error(SyntaxError(InvalidNumber, self.line, self.col))
-                } else if res == 0 {
-                    I64Value(res as i64)
-                } else {
-                    I64Value((!res + 1) as i64)
+                match self.int_from_str::<i64>(&s) {
+                    Ok(res) => I64Value(res),
+                    Err(e) => Error(e)
                 }
             } else {
-                U64Value(res)
+                match self.int_from_str::<u64>(&s) {
+                    Ok(res) => U64Value(res),
+                    Err(e) => Error(e)
+                }
             }
         }
     }
 
-    fn parse_u64(&mut self) -> Result<u64, ParserError> {
-        let mut accum: u64 = 0;
+    fn get_leading_digits(&mut self) -> Result<String, ParserError> {
+        let mut accum = String::new();
 
         match self.ch_or_null() {
             '0' => {
+                accum.push('0');
                 self.bump();
 
                 // A leading '0' must be the only digit before the decimal point.
@@ -1548,17 +1582,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
                 while !self.eof() {
                     match self.ch_or_null() {
                         c @ '0' ... '9' => {
-                            macro_rules! try_or_invalid {
-                                ($e: expr) => {
-                                    match $e {
-                                        Some(v) => v,
-                                        None => return self.error(InvalidNumber)
-                                    }
-                                }
-                            }
-                            accum = try_or_invalid!(accum.checked_mul(10));
-                            accum = try_or_invalid!(accum.checked_add((c as u64) - ('0' as u64)));
-
+                            accum.push(c);
                             self.bump();
                         }
                         _ => break,
@@ -1571,71 +1595,25 @@ impl<T: Iterator<Item = char>> Parser<T> {
         Ok(accum)
     }
 
-    fn parse_decimal(&mut self, mut res: f64) -> Result<f64, ParserError> {
-        self.bump();
+    fn get_digits(&mut self) -> Result<String, ParserError> {
+        let mut accum = String::new();
 
-        // Make sure a digit follows the decimal place.
         match self.ch_or_null() {
-            '0' ... '9' => (),
-             _ => return self.error(InvalidNumber)
-        }
-
-        let mut dec = 1.0;
-        let mut frac = 0.0;
-        while !self.eof() {
-            match self.ch_or_null() {
-                c @ '0' ... '9' => {
-                    dec /= 10.0;
-                    frac += (((c as isize) - ('0' as isize)) as f64) * dec;
-                    self.bump();
+            '0' ... '9' => {
+                while !self.eof() {
+                    match self.ch_or_null() {
+                        c @ '0' ... '9' => {
+                            accum.push(c);
+                            self.bump();
+                        }
+                        _ => break,
+                    }
                 }
-                _ => break,
             }
+            _ => return self.error(InvalidNumber),
         }
 
-        res += frac;
-
-        Ok(res)
-    }
-
-    fn parse_exponent(&mut self, mut res: f64) -> Result<f64, ParserError> {
-        self.bump();
-
-        let mut exp = 0;
-        let mut neg_exp = false;
-
-        if self.ch_is('+') {
-            self.bump();
-        } else if self.ch_is('-') {
-            self.bump();
-            neg_exp = true;
-        }
-
-        // Make sure a digit follows the exponent place.
-        match self.ch_or_null() {
-            '0' ... '9' => (),
-            _ => return self.error(InvalidNumber)
-        }
-        while !self.eof() {
-            match self.ch_or_null() {
-                c @ '0' ... '9' => {
-                    exp *= 10;
-                    exp += (c as usize) - ('0' as usize);
-
-                    self.bump();
-                }
-                _ => break
-            }
-        }
-
-        let exp = 10_f64.powi(exp as i32);
-        if neg_exp {
-            res /= exp;
-        } else {
-            res *= exp;
-        }
-
-        Ok(res)
+        Ok(accum)
     }
 
     fn decode_hex_escape(&mut self) -> Result<u16, ParserError> {
@@ -2586,6 +2564,7 @@ impl FromStr for Json {
 }
 
 #[cfg(test)]
+
 mod tests {
     use self::Animal::*;
     use {Encodable, Decodable};
@@ -2926,6 +2905,17 @@ mod tests {
         assert_eq!(v, false);
     }
 
+    /// Test if two values are within 1% of each other
+    ///
+    /// Useful when floating point imprecision is a factor. f64 should
+    /// have 53 bits for the coefficient, but we test if the result is
+    /// within 50 bits.
+    macro_rules! assert_nearly_eq {
+        ($e1:expr,$e2:expr) => {
+            assert!((($e1-$e2)/$e1).abs() < 2.0f64.powi(50).recip());
+        }
+    }
+
     #[test]
     fn test_read_number() {
         assert_eq!(Json::from_str("+"),   Err(SyntaxError(InvalidSyntax, 1, 1)));
@@ -2939,7 +2929,7 @@ mod tests {
 
         assert_eq!(Json::from_str("18446744073709551616"), Err(SyntaxError(InvalidNumber, 1, 20)));
         assert_eq!(Json::from_str("18446744073709551617"), Err(SyntaxError(InvalidNumber, 1, 20)));
-        assert_eq!(Json::from_str("-9223372036854775809"), Err(SyntaxError(InvalidNumber, 1, 21)));
+        assert_eq!(Json::from_str("-9223372036854775809"), Err(SyntaxError(InvalidNumber, 1, 20)));
 
         assert_eq!(Json::from_str("3"), Ok(U64(3)));
         assert_eq!(Json::from_str("3.1"), Ok(F64(3.1)));
@@ -2947,9 +2937,10 @@ mod tests {
         assert_eq!(Json::from_str("0.4"), Ok(F64(0.4)));
         assert_eq!(Json::from_str("0.4e5"), Ok(F64(0.4e5)));
         assert_eq!(Json::from_str("0.4e+15"), Ok(F64(0.4e15)));
-        assert_eq!(Json::from_str("0.4e-01"), Ok(F64(0.4e-01)));
+        assert_nearly_eq!(Json::from_str("0.4e-01"), Ok(F64(0.4e-01)));
         assert_eq!(Json::from_str("123456789.5024"), Ok(F64(123456789.5024)));
         assert_eq!(Json::from_str(" 3 "), Ok(U64(3)));
+        assert_eq!(Json::from_str("20000000000000000000.0"), Ok(F64(2.0e19)));
 
         assert_eq!(Json::from_str("-9223372036854775808"), Ok(I64(i64::MIN)));
         assert_eq!(Json::from_str("9223372036854775807"), Ok(U64(i64::MAX as u64)));
@@ -2977,7 +2968,10 @@ mod tests {
         assert_eq!(v, 0.4e15);
 
         let v: f64 = super::decode("0.4e-01").unwrap();
-        assert_eq!(v, 0.4e-01);
+        assert_nearly_eq!(v, 0.4e-01);
+
+        let v: f64 = super::decode("0.5e-01").unwrap();
+        assert_eq!(v, 0.5e-01);
 
         let v: f64 = super::decode("123456789.5024").unwrap();
         assert_eq!(v, 123456789.5024);
