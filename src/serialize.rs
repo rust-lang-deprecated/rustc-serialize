@@ -1371,6 +1371,10 @@ impl Encodable for path::Path {
         let v = self.as_os_str().encode_wide().collect::<Vec<_>>();
         v.encode(e)
     }
+    #[cfg(not(any(target_os = "redox", unix, windows)))]
+    fn encode<S: Encoder>(&self, _e: &mut S) -> Result<(), S::Error> {
+        unimplemented!();
+    }
 }
 
 impl Encodable for path::PathBuf {
@@ -1405,6 +1409,10 @@ impl Decodable for path::PathBuf {
         let mut p = path::PathBuf::new();
         p.push(s);
         Ok(p)
+    }
+    #[cfg(not(any(target_os = "redox", unix, windows)))]
+    fn decode<D: Decoder>(_d: &mut D) -> Result<path::PathBuf, D::Error> {
+        unimplemented!();
     }
 }
 
