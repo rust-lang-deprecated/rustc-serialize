@@ -12,6 +12,8 @@ of `derive(RustcEncodable, RustcDecodable)`.
 
 [![Linux Build Status](https://travis-ci.org/rust-lang-nursery/rustc-serialize.svg?branch=master)](https://travis-ci.org/rust-lang-nursery/rustc-serialize)
 [![Windows Build Status](https://ci.appveyor.com/api/projects/status/ka194de75aapwpft?svg=true)](https://ci.appveyor.com/project/alexcrichton/rustc-serialize)
+[![deprecated](http://badges.github.io/stability-badges/dist/deprecated.svg)](http://github.com/badges/stability-badges)
+
 
 [Documentation](https://docs.rs/rustc-serialize)
 
