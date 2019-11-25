@@ -1116,13 +1116,13 @@ impl<T: ?Sized + Encodable> Encodable for Box<T> {
 
 impl< T: Decodable> Decodable for Box<T> {
     fn decode<D: Decoder>(d: &mut D) -> Result<Box<T>, D::Error> {
-        Ok(Box::new(try!(Decodable::decode(d))))
+        Ok(Box::new(Decodable::decode(d)?))
     }
 }
 
 impl< T: Decodable> Decodable for Box<[T]> {
     fn decode<D: Decoder>(d: &mut D) -> Result<Box<[T]>, D::Error> {
-        let v: Vec<T> = try!(Decodable::decode(d));
+        let v: Vec<T> = Decodable::decode(d)?;
         Ok(v.into_boxed_slice())
     }
 }
@@ -1137,7 +1137,7 @@ impl<T:Encodable> Encodable for Rc<T> {
 impl<T:Decodable> Decodable for Rc<T> {
     #[inline]
     fn decode<D: Decoder>(d: &mut D) -> Result<Rc<T>, D::Error> {
-        Ok(Rc::new(try!(Decodable::decode(d))))
+        Ok(Rc::new(Decodable::decode(d)?))
     }
 }
 
@@ -1153,7 +1153,7 @@ impl<'a, T: ?Sized> Decodable for Cow<'a, T>
 {
     #[inline]
     fn decode<D: Decoder>(d: &mut D) -> Result<Cow<'static, T>, D::Error> {
-        Ok(Cow::Owned(try!(Decodable::decode(d))))
+        Ok(Cow::Owned(Decodable::decode(d)?))
     }
 }
 
@@ -1161,7 +1161,7 @@ impl<T:Encodable> Encodable for [T] {
     fn encode<S: Encoder>(&self, s: &mut S) -> Result<(), S::Error> {
         s.emit_seq(self.len(), |s| {
             for (i, e) in self.iter().enumerate() {
-                try!(s.emit_seq_elt(i, |s| e.encode(s)))
+                s.emit_seq_elt(i, |s| e.encode(s))?
             }
             Ok(())
         })
@@ -1172,7 +1172,7 @@ impl<T:Encodable> Encodable for Vec<T> {
     fn encode<S: Encoder>(&self, s: &mut S) -> Result<(), S::Error> {
         s.emit_seq(self.len(), |s| {
             for (i, e) in self.iter().enumerate() {
-                try!(s.emit_seq_elt(i, |s| e.encode(s)))
+                s.emit_seq_elt(i, |s| e.encode(s))?
             }
             Ok(())
         })
@@ -1184,7 +1184,7 @@ impl<T:Decodable> Decodable for Vec<T> {
         d.read_seq(|d, len| {
             let mut v = Vec::with_capacity(cap_capacity::<T>(len));
             for i in 0..len {
-                v.push(try!(d.read_seq_elt(i, |d| Decodable::decode(d))));
+                v.push(d.read_seq_elt(i, |d| Decodable::decode(d))?);
             }
             Ok(v)
         })
@@ -1206,7 +1206,7 @@ impl<T:Decodable> Decodable for Option<T> {
     fn decode<D: Decoder>(d: &mut D) -> Result<Option<T>, D::Error> {
         d.read_option(|d, b| {
             if b {
-                Ok(Some(try!(Decodable::decode(d))))
+                Ok(Some(Decodable::decode(d)?))
             } else {
                 Ok(None)
             }
@@ -1220,17 +1220,17 @@ impl<T:Encodable, E:Encodable> Encodable for Result<T, E> {
             match *self {
                 Ok(ref v) => {
                     s.emit_enum_variant("Ok", 0, 1, |s| {
-                        try!(s.emit_enum_variant_arg(0, |s| {
+                        s.emit_enum_variant_arg(0, |s| {
                             v.encode(s)
-                        }));
+                        })?;
                         Ok(())
                     })
                 }
                 Err(ref v) => {
                     s.emit_enum_variant("Err", 1, 1, |s| {
-                        try!(s.emit_enum_variant_arg(0, |s| {
+                        s.emit_enum_variant_arg(0, |s| {
                             v.encode(s)
-                        }));
+                        })?;
                         Ok(())
                     })
                 }
@@ -1292,10 +1292,10 @@ macro_rules! tuple {
                 let len: usize = count_idents!($($name,)*);
                 d.read_tuple(len, |d| {
                     let mut i = 0;
-                    let ret = ($(try!(d.read_tuple_arg({ i+=1; i-1 },
+                    let ret = ($(d.read_tuple_arg({ i+=1; i-1 },
                                                        |d| -> Result<$name,D::Error> {
                         Decodable::decode(d)
-                    })),)*);
+                    })?,)*);
                     return Ok(ret);
                 })
             }
@@ -1308,7 +1308,7 @@ macro_rules! tuple {
                 $(let $name = $name; n += 1;)*
                 s.emit_tuple(n, |s| {
                     let mut i = 0;
-                    $(try!(s.emit_tuple_arg({ i+=1; i-1 }, |s| $name.encode(s)));)*
+                    $(s.emit_tuple_arg({ i+=1; i-1 }, |s| $name.encode(s))?;)*
                     Ok(())
                 })
             }
@@ -1329,8 +1329,8 @@ macro_rules! array {
                         return Err(d.error("wrong array length"));
                     }
                     Ok([$(
-                        try!(d.read_seq_elt($len - $idx - 1,
-                                            |d| Decodable::decode(d)))
+                        d.read_seq_elt($len - $idx - 1,
+                                            |d| Decodable::decode(d))?
                     ),*])
                 })
             }
@@ -1340,7 +1340,7 @@ macro_rules! array {
             fn encode<S: Encoder>(&self, s: &mut S) -> Result<(), S::Error> {
                 s.emit_seq($len, |s| {
                     for i in 0..$len {
-                        try!(s.emit_seq_elt(i, |s| self[i].encode(s)));
+                        s.emit_seq_elt(i, |s| self[i].encode(s))?;
                     }
                     Ok(())
                 })
@@ -1391,7 +1391,7 @@ impl Decodable for path::PathBuf {
     #[cfg(unix)]
     fn decode<D: Decoder>(d: &mut D) -> Result<path::PathBuf, D::Error> {
         use std::os::unix::prelude::*;
-        let bytes: Vec<u8> = try!(Decodable::decode(d));
+        let bytes: Vec<u8> = Decodable::decode(d)?;
         let s: OsString = OsStringExt::from_vec(bytes);
         let mut p = path::PathBuf::new();
         p.push(s);
@@ -1416,7 +1416,7 @@ impl<T: Encodable + Copy> Encodable for Cell<T> {
 
 impl<T: Decodable + Copy> Decodable for Cell<T> {
     fn decode<D: Decoder>(d: &mut D) -> Result<Cell<T>, D::Error> {
-        Ok(Cell::new(try!(Decodable::decode(d))))
+        Ok(Cell::new(Decodable::decode(d)?))
     }
 }
 
@@ -1433,7 +1433,7 @@ impl<T: Encodable> Encodable for RefCell<T> {
 
 impl<T: Decodable> Decodable for RefCell<T> {
     fn decode<D: Decoder>(d: &mut D) -> Result<RefCell<T>, D::Error> {
-        Ok(RefCell::new(try!(Decodable::decode(d))))
+        Ok(RefCell::new(Decodable::decode(d)?))
     }
 }
 
@@ -1445,7 +1445,7 @@ impl<T:Encodable> Encodable for Arc<T> {
 
 impl<T:Decodable+Send+Sync> Decodable for Arc<T> {
     fn decode<D: Decoder>(d: &mut D) -> Result<Arc<T>, D::Error> {
-        Ok(Arc::new(try!(Decodable::decode(d))))
+        Ok(Arc::new(Decodable::decode(d)?))
     }
 }
 
@@ -1498,9 +1498,9 @@ impl<S:Encoder> EncoderHelpers for S {
     {
         self.emit_seq(v.len(), |this| {
             for (i, e) in v.iter().enumerate() {
-                try!(this.emit_seq_elt(i, |this| {
+                this.emit_seq_elt(i, |this| {
                     f(this, e)
-                }));
+                })?;
             }
             Ok(())
         })
@@ -1554,7 +1554,7 @@ impl<D: Decoder> DecoderHelpers for D {
         self.read_seq(|this, len| {
             let mut v = Vec::with_capacity(cap_capacity::<T>(len));
             for i in 0..len {
-                v.push(try!(this.read_seq_elt(i, |this| f(this))));
+                v.push(this.read_seq_elt(i, |this| f(this))?);
             }
             Ok(v)
         })

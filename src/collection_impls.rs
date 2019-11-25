@@ -21,7 +21,7 @@ impl<
     fn encode<S: Encoder>(&self, s: &mut S) -> Result<(), S::Error> {
         s.emit_seq(self.len(), |s| {
             for (i, e) in self.iter().enumerate() {
-                try!(s.emit_seq_elt(i, |s| e.encode(s)));
+                s.emit_seq_elt(i, |s| e.encode(s))?;
             }
             Ok(())
         })
@@ -33,7 +33,7 @@ impl<T:Decodable> Decodable for LinkedList<T> {
         d.read_seq(|d, len| {
             let mut list = LinkedList::new();
             for i in 0..len {
-                list.push_back(try!(d.read_seq_elt(i, |d| Decodable::decode(d))));
+                list.push_back(d.read_seq_elt(i, |d| Decodable::decode(d))?);
             }
             Ok(list)
         })
@@ -44,7 +44,7 @@ impl<T: Encodable> Encodable for VecDeque<T> {
     fn encode<S: Encoder>(&self, s: &mut S) -> Result<(), S::Error> {
         s.emit_seq(self.len(), |s| {
             for (i, e) in self.iter().enumerate() {
-                try!(s.emit_seq_elt(i, |s| e.encode(s)));
+                s.emit_seq_elt(i, |s| e.encode(s))?;
             }
             Ok(())
         })
@@ -56,7 +56,7 @@ impl<T:Decodable> Decodable for VecDeque<T> {
         d.read_seq(|d, len| {
             let mut deque: VecDeque<T> = VecDeque::new();
             for i in 0..len {
-                deque.push_back(try!(d.read_seq_elt(i, |d| Decodable::decode(d))));
+                deque.push_back(d.read_seq_elt(i, |d| Decodable::decode(d))?);
             }
             Ok(deque)
         })
@@ -71,8 +71,8 @@ impl<
         e.emit_map(self.len(), |e| {
             let mut i = 0;
             for (key, val) in self.iter() {
-                try!(e.emit_map_elt_key(i, |e| key.encode(e)));
-                try!(e.emit_map_elt_val(i, |e| val.encode(e)));
+                e.emit_map_elt_key(i, |e| key.encode(e))?;
+                e.emit_map_elt_val(i, |e| val.encode(e))?;
                 i += 1;
             }
             Ok(())
@@ -88,8 +88,8 @@ impl<
         d.read_map(|d, len| {
             let mut map = BTreeMap::new();
             for i in 0..len {
-                let key = try!(d.read_map_elt_key(i, |d| Decodable::decode(d)));
-                let val = try!(d.read_map_elt_val(i, |d| Decodable::decode(d)));
+                let key = d.read_map_elt_key(i, |d| Decodable::decode(d))?;
+                let val = d.read_map_elt_val(i, |d| Decodable::decode(d))?;
                 map.insert(key, val);
             }
             Ok(map)
@@ -104,7 +104,7 @@ impl<
         s.emit_seq(self.len(), |s| {
             let mut i = 0;
             for e in self.iter() {
-                try!(s.emit_seq_elt(i, |s| e.encode(s)));
+                s.emit_seq_elt(i, |s| e.encode(s))?;
                 i += 1;
             }
             Ok(())
@@ -119,7 +119,7 @@ impl<
         d.read_seq(|d, len| {
             let mut set = BTreeSet::new();
             for i in 0..len {
-                set.insert(try!(d.read_seq_elt(i, |d| Decodable::decode(d))));
+                set.insert(d.read_seq_elt(i, |d| Decodable::decode(d))?);
             }
             Ok(set)
         })
@@ -134,8 +134,8 @@ impl<K, V> Encodable for HashMap<K, V>
         e.emit_map(self.len(), |e| {
             let mut i = 0;
             for (key, val) in self.iter() {
-                try!(e.emit_map_elt_key(i, |e| key.encode(e)));
-                try!(e.emit_map_elt_val(i, |e| val.encode(e)));
+                e.emit_map_elt_key(i, |e| key.encode(e))?;
+                e.emit_map_elt_val(i, |e| val.encode(e))?;
                 i += 1;
             }
             Ok(())
@@ -151,8 +151,8 @@ impl<K, V> Decodable for HashMap<K, V>
         d.read_map(|d, len| {
             let mut map = HashMap::with_capacity(cap_capacity::<(K, V)>(len));
             for i in 0..len {
-                let key = try!(d.read_map_elt_key(i, |d| Decodable::decode(d)));
-                let val = try!(d.read_map_elt_val(i, |d| Decodable::decode(d)));
+                let key = d.read_map_elt_key(i, |d| Decodable::decode(d))?;
+                let val = d.read_map_elt_val(i, |d| Decodable::decode(d))?;
                 map.insert(key, val);
             }
             Ok(map)
@@ -165,7 +165,7 @@ impl<T> Encodable for HashSet<T> where T: Encodable + Hash + Eq {
         s.emit_seq(self.len(), |s| {
             let mut i = 0;
             for e in self.iter() {
-                try!(s.emit_seq_elt(i, |s| e.encode(s)));
+                s.emit_seq_elt(i, |s| e.encode(s))?;
                 i += 1;
             }
             Ok(())
@@ -178,7 +178,7 @@ impl<T> Decodable for HashSet<T> where T: Decodable + Hash + Eq, {
         d.read_seq(|d, len| {
             let mut set = HashSet::with_capacity(cap_capacity::<T>(len));
             for i in 0..len {
-                set.insert(try!(d.read_seq_elt(i, |d| Decodable::decode(d))));
+                set.insert(d.read_seq_elt(i, |d| Decodable::decode(d))?);
             }
             Ok(set)
         })
