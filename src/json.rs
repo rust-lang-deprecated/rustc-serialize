@@ -2587,8 +2587,6 @@ impl FromStr for Json {
 
 #[cfg(test)]
 mod tests {
-    use self::Animal::*;
-    use {Encodable, Decodable};
     use super::Json::*;
     use super::ErrorCode::*;
     use super::ParserError::*;
@@ -2596,55 +2594,10 @@ mod tests {
     use super::JsonEvent::*;
     use super::StackElement::*;
     use super::{Json, DecodeResult, DecoderError, JsonEvent, Parser,
-                StackElement, Stack, Decoder, Encoder, EncoderError};
+                StackElement, Stack, Decoder};
     use std::{i64, u64, f32, f64};
     use std::collections::BTreeMap;
     use std::string;
-
-    #[derive(RustcDecodable, Eq, PartialEq, Debug)]
-    struct OptionData {
-        opt: Option<usize>,
-    }
-
-    #[test]
-    fn test_decode_option_none() {
-        let s ="{}";
-        let obj: OptionData = super::decode(s).unwrap();
-        assert_eq!(obj, OptionData { opt: None });
-    }
-
-    #[test]
-    fn test_decode_option_some() {
-        let s = "{ \"opt\": 10 }";
-        let obj: OptionData = super::decode(s).unwrap();
-        assert_eq!(obj, OptionData { opt: Some(10) });
-    }
-
-    #[test]
-    fn test_decode_option_malformed() {
-        check_err::<OptionData>("{ \"opt\": [] }",
-                                ExpectedError("Number".to_string(), "[]".to_string()));
-        check_err::<OptionData>("{ \"opt\": false }",
-                                ExpectedError("Number".to_string(), "false".to_string()));
-    }
-
-    #[derive(PartialEq, RustcEncodable, RustcDecodable, Debug)]
-    enum Animal {
-        Dog,
-        Frog(string::String, isize)
-    }
-
-    #[derive(PartialEq, RustcEncodable, RustcDecodable, Debug)]
-    struct Inner {
-        a: (),
-        b: usize,
-        c: Vec<string::String>,
-    }
-
-    #[derive(PartialEq, RustcEncodable, RustcDecodable, Debug)]
-    struct Outer {
-        inner: Vec<Inner>,
-    }
 
     fn mk_object(items: &[(string::String, Json)]) -> Json {
         let mut d = BTreeMap::new();
@@ -2824,35 +2777,6 @@ mod tests {
         // printed in a different order.
         assert_eq!(a.clone(), a.to_string().parse().unwrap());
         assert_eq!(a.clone(), a.pretty().to_string().parse().unwrap());
-    }
-
-    #[test]
-    fn test_write_enum() {
-        let animal = Dog;
-        assert_eq!(
-            format!("{}", super::as_json(&animal)),
-            "\"Dog\""
-        );
-        assert_eq!(
-            format!("{}", super::as_pretty_json(&animal)),
-            "\"Dog\""
-        );
-
-        let animal = Frog("Henry".to_string(), 349);
-        assert_eq!(
-            format!("{}", super::as_json(&animal)),
-            "{\"variant\":\"Frog\",\"fields\":[\"Henry\",349]}"
-        );
-        assert_eq!(
-            format!("{}", super::as_pretty_json(&animal)),
-            "{\n  \
-               \"variant\": \"Frog\",\n  \
-               \"fields\": [\n    \
-                 \"Henry\",\n    \
-                 349\n  \
-               ]\n\
-             }"
-        );
     }
 
     macro_rules! check_encoder_for_simple {
@@ -3162,55 +3086,12 @@ mod tests {
     }
 
     #[test]
-    fn test_decode_struct() {
-        let s = "{
-            \"inner\": [
-                { \"a\": null, \"b\": 2, \"c\": [\"abc\", \"xyz\"] }
-            ]
-        }";
-
-        let v: Outer = super::decode(s).unwrap();
-        assert_eq!(
-            v,
-            Outer {
-                inner: vec![
-                    Inner { a: (), b: 2, c: vec!["abc".to_string(), "xyz".to_string()] }
-                ]
-            }
-        );
-    }
-
-    #[derive(RustcDecodable)]
-    struct FloatStruct {
-        f: f64,
-        a: Vec<f64>
-    }
-    #[test]
-    fn test_decode_struct_with_nan() {
-        let s = "{\"f\":null,\"a\":[null,123]}";
-        let obj: FloatStruct = super::decode(s).unwrap();
-        assert!(obj.f.is_nan());
-        assert!(obj.a[0].is_nan());
-        assert_eq!(obj.a[1], 123f64);
-    }
-
-    #[test]
     fn test_decode_option() {
         let value: Option<string::String> = super::decode("null").unwrap();
         assert_eq!(value, None);
 
         let value: Option<string::String> = super::decode("\"jodhpurs\"").unwrap();
         assert_eq!(value, Some("jodhpurs".to_string()));
-    }
-
-    #[test]
-    fn test_decode_enum() {
-        let value: Animal = super::decode("\"Dog\"").unwrap();
-        assert_eq!(value, Dog);
-
-        let s = "{\"variant\":\"Frog\",\"fields\":[\"Henry\",349]}";
-        let value: Animal = super::decode(s).unwrap();
-        assert_eq!(value, Frog("Henry".to_string(), 349));
     }
 
     #[test]
@@ -3223,22 +3104,11 @@ mod tests {
     }
 
     #[test]
-    fn test_decode_map() {
-        let s = "{\"a\": \"Dog\", \"b\": {\"variant\":\"Frog\",\
-                  \"fields\":[\"Henry\", 349]}}";
-        let mut map: BTreeMap<string::String, Animal> = super::decode(s).unwrap();
-
-        assert_eq!(map.remove(&"a".to_string()), Some(Dog));
-        assert_eq!(map.remove(&"b".to_string()), Some(Frog("Henry".to_string(), 349)));
-    }
-
-    #[test]
     fn test_multiline_errors() {
         assert_eq!(Json::from_str("{\n  \"foo\":\n \"bar\""),
             Err(SyntaxError(EOFWhileParsingObject, 3, 8)));
     }
 
-    #[derive(RustcDecodable)]
     #[allow(dead_code)]
     struct DecodeStruct {
         x: f64,
@@ -3246,54 +3116,6 @@ mod tests {
         z: string::String,
         w: Vec<DecodeStruct>
     }
-    #[derive(RustcDecodable)]
-    enum DecodeEnum {
-        A(f64),
-        B(string::String)
-    }
-    fn check_err<T: Decodable>(to_parse: &'static str, expected: DecoderError) {
-        let res: DecodeResult<T> = match Json::from_str(to_parse) {
-            Err(e) => Err(ParseError(e)),
-            Ok(json) => Decodable::decode(&mut Decoder::new(json))
-        };
-        match res {
-            Ok(_) => panic!("`{:?}` parsed & decoded ok, expecting error `{:?}`",
-                              to_parse, expected),
-            Err(ParseError(e)) => panic!("`{}` is not valid json: {:?}",
-                                           to_parse, e),
-            Err(e) => {
-                assert_eq!(e, expected);
-            }
-        }
-    }
-    #[test]
-    fn test_decode_errors_struct() {
-        check_err::<DecodeStruct>("[]", ExpectedError("Object".to_string(), "[]".to_string()));
-        check_err::<DecodeStruct>("{\"x\": true, \"y\": true, \"z\": \"\", \"w\": []}",
-                                  ExpectedError("Number".to_string(), "true".to_string()));
-        check_err::<DecodeStruct>("{\"x\": 1, \"y\": [], \"z\": \"\", \"w\": []}",
-                                  ExpectedError("Boolean".to_string(), "[]".to_string()));
-        check_err::<DecodeStruct>("{\"x\": 1, \"y\": true, \"z\": {}, \"w\": []}",
-                                  ExpectedError("String".to_string(), "{}".to_string()));
-        check_err::<DecodeStruct>("{\"x\": 1, \"y\": true, \"z\": \"\", \"w\": null}",
-                                  ExpectedError("Array".to_string(), "null".to_string()));
-        check_err::<DecodeStruct>("{\"x\": 1, \"y\": true, \"z\": \"\"}",
-                                  MissingFieldError("w".to_string()));
-    }
-    #[test]
-    fn test_decode_errors_enum() {
-        check_err::<DecodeEnum>("{}",
-                                MissingFieldError("variant".to_string()));
-        check_err::<DecodeEnum>("{\"variant\": 1}",
-                                ExpectedError("String".to_string(), "1".to_string()));
-        check_err::<DecodeEnum>("{\"variant\": \"A\"}",
-                                MissingFieldError("fields".to_string()));
-        check_err::<DecodeEnum>("{\"variant\": \"A\", \"fields\": null}",
-                                ExpectedError("Array".to_string(), "null".to_string()));
-        check_err::<DecodeEnum>("{\"variant\": \"C\", \"fields\": []}",
-                                UnknownVariantError("C".to_string()));
-    }
-
     #[test]
     fn test_find(){
         let json_value = Json::from_str("{\"dog\" : \"cat\"}").unwrap();
@@ -3548,24 +3370,6 @@ mod tests {
         };
         let mut decoder = Decoder::new(json_obj);
         let _hm: HashMap<usize, bool> = Decodable::decode(&mut decoder).unwrap();
-    }
-
-    #[test]
-    fn test_hashmap_with_enum_key() {
-        use std::collections::HashMap;
-        use json;
-        #[derive(RustcEncodable, Eq, Hash, PartialEq, RustcDecodable, Debug)]
-        enum Enum {
-            Foo,
-            #[allow(dead_code)]
-            Bar,
-        }
-        let mut map = HashMap::new();
-        map.insert(Enum::Foo, 0);
-        let result = json::encode(&map).unwrap();
-        assert_eq!(result, r#"{"Foo":0}"#);
-        let decoded: HashMap<Enum, _> = json::decode(&result).unwrap();
-        assert_eq!(map, decoded);
     }
 
     #[test]
@@ -3924,69 +3728,6 @@ mod tests {
         assert_eq!(Some(15).to_json(), I64(15));
         assert_eq!(Some(15 as u32).to_json(), U64(15));
         assert_eq!(None::<isize>.to_json(), Null);
-    }
-
-    #[test]
-    fn test_encode_hashmap_with_arbitrary_key() {
-        use std::collections::HashMap;
-        #[derive(PartialEq, Eq, Hash, RustcEncodable)]
-        struct ArbitraryType(u32);
-        let mut hm: HashMap<ArbitraryType, bool> = HashMap::new();
-        hm.insert(ArbitraryType(1), true);
-        let mut mem_buf = string::String::new();
-        let mut encoder = Encoder::new(&mut mem_buf);
-        let result = hm.encode(&mut encoder);
-        match result.err().unwrap() {
-            EncoderError::BadHashmapKey => (),
-            _ => panic!("expected bad hash map key")
-        }
-    }
-
-    #[test]
-    fn test_encode_decode_phantom_data() {
-        use std::marker::PhantomData;
-
-        #[derive(Debug, RustcDecodable, RustcEncodable, Eq, PartialEq)]
-        struct Foo<P> {
-            phantom_data: PhantomData<P>
-        }
-
-        let f: Foo<u8> = Foo {
-            phantom_data: PhantomData
-        };
-        let s = super::encode(&f).unwrap();
-        let d: Foo<u8> = super::decode(&s).unwrap();
-        assert_eq!(f, d);
-    }
-
-    #[test]
-    fn test_bad_json_stack_depleted() {
-        use json;
-        #[derive(Debug, RustcDecodable)]
-        enum ChatEvent {
-            Variant(i32)
-        }
-        let serialized = "{\"variant\": \"Variant\", \"fields\": []}";
-        let r: Result<ChatEvent, _> = json::decode(serialized);
-        assert!(r.unwrap_err() == EOF);
-    }
-
-    #[test]
-    fn fixed_length_array() {
-        #[derive(Debug, RustcDecodable, RustcEncodable, Eq, PartialEq)]
-        struct Foo {
-            a: [u8; 1],
-            b: [i32; 2],
-            c: [u64; 3],
-        }
-        let f = Foo {
-            a: [0],
-            b: [1, 2],
-            c: [3, 4, 5],
-        };
-        let s = super::encode(&f).unwrap();
-        let d = super::decode(&s).unwrap();
-        assert_eq!(f, d);
     }
 
     #[test]
