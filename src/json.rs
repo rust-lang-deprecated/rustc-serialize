@@ -1540,14 +1540,14 @@ impl<T: Iterator<Item = char>> Parser<T> {
 
                 // A leading '0' must be the only digit before the decimal point.
                 match self.ch_or_null() {
-                    '0' ... '9' => return self.error(InvalidNumber),
+                    '0' ..= '9' => return self.error(InvalidNumber),
                     _ => ()
                 }
             },
-            '1' ... '9' => {
+            '1' ..= '9' => {
                 while !self.eof() {
                     match self.ch_or_null() {
-                        c @ '0' ... '9' => {
+                        c @ '0' ..= '9' => {
                             macro_rules! try_or_invalid {
                                 ($e: expr) => {
                                     match $e {
@@ -1576,7 +1576,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
 
         // Make sure a digit follows the decimal place.
         match self.ch_or_null() {
-            '0' ... '9' => (),
+            '0' ..= '9' => (),
              _ => return self.error(InvalidNumber)
         }
 
@@ -1584,7 +1584,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
         let mut frac = 0.0;
         while !self.eof() {
             match self.ch_or_null() {
-                c @ '0' ... '9' => {
+                c @ '0' ..= '9' => {
                     dec /= 10.0;
                     frac += (((c as isize) - ('0' as isize)) as f64) * dec;
                     self.bump();
@@ -1613,12 +1613,12 @@ impl<T: Iterator<Item = char>> Parser<T> {
 
         // Make sure a digit follows the exponent place.
         match self.ch_or_null() {
-            '0' ... '9' => (),
+            '0' ..= '9' => (),
             _ => return self.error(InvalidNumber)
         }
         while !self.eof() {
             match self.ch_or_null() {
-                c @ '0' ... '9' => {
+                c @ '0' ..= '9' => {
                     exp *= 10;
                     exp += (c as usize) - ('0' as usize);
 
@@ -1644,9 +1644,9 @@ impl<T: Iterator<Item = char>> Parser<T> {
         while i < 4 {
             self.bump();
             n = match self.ch_or_null() {
-                c @ '0' ... '9' => n * 16 + ((c as u16) - ('0' as u16)),
-                c @ 'a' ... 'f' => n * 16 + (10 + (c as u16) - ('a' as u16)),
-                c @ 'A' ... 'F' => n * 16 + (10 + (c as u16) - ('A' as u16)),
+                c @ '0' ..= '9' => n * 16 + ((c as u16) - ('0' as u16)),
+                c @ 'a' ..= 'f' => n * 16 + (10 + (c as u16) - ('a' as u16)),
+                c @ 'A' ..= 'F' => n * 16 + (10 + (c as u16) - ('A' as u16)),
                 _ => return self.error(InvalidEscape)
             };
 
@@ -1677,13 +1677,13 @@ impl<T: Iterator<Item = char>> Parser<T> {
                     'r' => res.push('\r'),
                     't' => res.push('\t'),
                     'u' => match try!(self.decode_hex_escape()) {
-                        0xDC00 ... 0xDFFF => {
+                        0xDC00 ..= 0xDFFF => {
                             return self.error(LoneLeadingSurrogateInHexEscape)
                         }
 
                         // Non-BMP characters are encoded as a sequence of
                         // two hex escapes, representing UTF-16 surrogates.
-                        n1 @ 0xD800 ... 0xDBFF => {
+                        n1 @ 0xD800 ..= 0xDBFF => {
                             match (self.next_char(), self.next_char()) {
                                 (Some('\\'), Some('u')) => (),
                                 _ => return self.error(UnexpectedEndOfHexEscape),
@@ -1913,7 +1913,7 @@ impl<T: Iterator<Item = char>> Parser<T> {
             'n' => { self.parse_ident("ull", NullValue) }
             't' => { self.parse_ident("rue", BooleanValue(true)) }
             'f' => { self.parse_ident("alse", BooleanValue(false)) }
-            '0' ... '9' | '-' => self.parse_number(),
+            '0' ..= '9' | '-' => self.parse_number(),
             '"' => match self.parse_str() {
                 Ok(s) => StringValue(s),
                 Err(e) => Error(e),
