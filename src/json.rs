@@ -404,7 +404,7 @@ impl fmt::Debug for ErrorCode {
 
 impl StdError for DecoderError {
     fn description(&self) -> &str { "decoder error" }
-    fn cause(&self) -> Option<&StdError> {
+    fn cause(&self) -> Option<&dyn StdError> {
         match *self {
             DecoderError::ParseError(ref e) => Some(e),
             _ => None,
@@ -457,7 +457,7 @@ impl From<fmt::Error> for EncoderError {
 pub type EncodeResult<T> = Result<T, EncoderError>;
 pub type DecodeResult<T> = Result<T, DecoderError>;
 
-fn escape_str(wr: &mut fmt::Write, v: &str) -> EncodeResult<()> {
+fn escape_str(wr: &mut dyn fmt::Write, v: &str) -> EncodeResult<()> {
     wr.write_str("\"")?;
 
     let mut start = 0;
@@ -519,14 +519,14 @@ fn escape_str(wr: &mut fmt::Write, v: &str) -> EncodeResult<()> {
     Ok(())
 }
 
-fn escape_char(writer: &mut fmt::Write, v: char) -> EncodeResult<()> {
+fn escape_char(writer: &mut dyn fmt::Write, v: char) -> EncodeResult<()> {
     let mut buf = [0; 4];
     let _ = write!(&mut &mut buf[..], "{}", v);
     let buf = unsafe { str::from_utf8_unchecked(&buf[..v.len_utf8()]) };
     escape_str(writer, buf)
 }
 
-fn spaces(wr: &mut fmt::Write, n: u32) -> EncodeResult<()> {
+fn spaces(wr: &mut dyn fmt::Write, n: u32) -> EncodeResult<()> {
     let mut n = n as usize;
     const BUF: &'static str = "                ";
 
@@ -575,7 +575,7 @@ enum EncodingFormat {
 
 /// A structure for implementing serialization to JSON.
 pub struct Encoder<'a> {
-    writer: &'a mut (fmt::Write+'a),
+    writer: &'a mut dyn fmt::Write,
     format : EncodingFormat,
     is_emitting_map_key: bool,
 }
@@ -583,7 +583,7 @@ pub struct Encoder<'a> {
 impl<'a> Encoder<'a> {
     /// Creates a new encoder whose output will be written in human-readable
     /// JSON to the specified writer
-    pub fn new_pretty(writer: &'a mut fmt::Write) -> Encoder<'a> {
+    pub fn new_pretty(writer: &'a mut dyn fmt::Write) -> Encoder<'a> {
         Encoder {
             writer: writer,
             format: EncodingFormat::Pretty {
@@ -596,7 +596,7 @@ impl<'a> Encoder<'a> {
 
     /// Creates a new encoder whose output will be written in compact
     /// JSON to the specified writer
-    pub fn new(writer: &'a mut fmt::Write) -> Encoder<'a> {
+    pub fn new(writer: &'a mut dyn fmt::Write) -> Encoder<'a> {
         Encoder {
             writer: writer,
             format: EncodingFormat::Compact,
@@ -956,7 +956,7 @@ pub fn as_pretty_json<T: Encodable>(t: &T) -> AsPrettyJson<T> {
 
 impl Json {
     /// Decodes a json value from an `&mut io::Read`
-    pub fn from_reader(rdr: &mut io::Read) -> Result<Self, BuilderError> {
+    pub fn from_reader(rdr: &mut dyn io::Read) -> Result<Self, BuilderError> {
         let contents = {
             let mut c = Vec::new();
             rdr.read_to_end(&mut c)?;
