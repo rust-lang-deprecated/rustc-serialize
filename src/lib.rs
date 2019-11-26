@@ -41,6 +41,7 @@
        html_favicon_url = "https://www.rust-lang.org/favicon.ico",
        html_root_url = "https://doc.rust-lang.org/rustc-serialize/")]
 #![cfg_attr(test, deny(warnings))]
+#![deny(ellipsis_inclusive_range_patterns)]
 #![allow(trivial_numeric_casts)]
 #![cfg_attr(rust_build, feature(staged_api))]
 #![cfg_attr(rust_build, staged_api)]
